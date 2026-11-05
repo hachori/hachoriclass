@@ -164,7 +164,7 @@ class CapsuleGame {
     document.addEventListener('keydown', event => {
       if (event.ctrlKey && event.key === 'Enter' && !event.repeat && this.phase === 'idle') { event.preventDefault(); this.draw('single'); }
     });
-    window.addEventListener('resize', () => this.machine.resize());
+    window.addEventListener('resize', () => { this.machine.resize(); this.fitSpotlightName(); });
     document.addEventListener('visibilitychange', () => document.hidden ? this.machine.stop() : this.machine.start());
     this.motion.addEventListener('change', () => { this.machine.stop(); this.machine.start(); this.machine.draw(); });
     window.addEventListener('pagehide', () => { this.machine.stop(); this.stopConfetti(); });
@@ -394,26 +394,36 @@ class CapsuleGame {
     $('machine-scene').classList.add('delivering');
     this.tone(500,.2); this.tone(760,.25,.16);
     await pause(reduced ? 80 : 700);
+    const chute = document.querySelector('.chute').getBoundingClientRect();
+    const launchOrigin = {x:chute.left + chute.width / 2,y:chute.top + chute.height / 2};
     $('machine-scene').classList.remove('mixing','delivering'); this.machine.active = false;
     this.phase = 'revealing'; this.updateUI();
     $('result-title').textContent = roleMode ? '우리 반 역할 탐사대!' : count === 1 ? '오늘의 주인공!' : '오늘의 주인공들!';
     $('result-eyebrow').textContent = 'OPENING CAPSULES';
     $('result-subtitle').textContent = '두근두근, 캡슐이 열리고 있어요.';
     const cards = this.makeCards();
+    $('winner-cards').hidden = true;
+    $('spotlight').hidden = false;
+    $('spotlight').className = 'spotlight';
+    $('spotlight-name').textContent = '';
+    $('spotlight-role').textContent = '';
+    $('result-dialog').classList.remove('show-summary');
     $('result-dialog').showModal();
     $('result-dialog').scrollTop = 0;
     $('result-dialog').append($('confetti'));
-    const interval = reduced ? 25 : Math.min(quick ? 230 : 550,(quick ? 1400 : 3300) / count);
     for (let i = 0; i < cards.length; i++) {
-      await pause(interval);
+      await this.revealWinner(this.lastWinners[i],i,count,{quick,reduced,origin:launchOrigin});
       cards[i].querySelector('.winner-name').textContent = this.lastWinners[i].label;
       cards[i].classList.add('opened');
       cards[i].setAttribute('aria-label',(this.lastWinners[i].role ? this.lastWinners[i].role + ': ' : '') + this.lastWinners[i].label);
       $('result-subtitle').textContent = (i + 1) + ' / ' + count + ' 캡슐 공개!';
-      this.tone(523.25 * Math.pow(1.12246,i % 6),.2,0,.025);
-      if (count > 6) cards[i].scrollIntoView({block:'nearest',behavior:'instant'});
     }
-    await pause(reduced ? 30 : 850);
+    if (count > 1) {
+      $('spotlight').hidden = true;
+      $('winner-cards').hidden = false;
+      $('result-dialog').classList.add('show-summary');
+      $('winner-cards').scrollTop = 0;
+    }
     this.phase = 'result';
     $('result-eyebrow').textContent = 'MISSION COMPLETE';
     $('result-subtitle').textContent = roleMode ? '각자의 역할로 멋지게 활약해 주세요!' : '축하해요! 반짝이는 오늘의 주인공이에요.';
@@ -423,6 +433,55 @@ class CapsuleGame {
     [523.25,659.25,783.99,1046.5].forEach((f,i) => this.tone(f,.4,i * .1));
     this.celebrate();
     ($('remove-winners').checked ? $('exclude-winners') : $('keep-winners')).focus({preventScroll:true});
+  }
+  fitSpotlightName() {
+    const name = $('spotlight-name');
+    if (!name || !name.textContent || $('spotlight').hidden) return;
+    name.style.fontSize = '';
+    const style = getComputedStyle(name);
+    const size = parseFloat(style.fontSize);
+    const width = Math.max(100,$('spotlight').clientWidth - (innerWidth < 600 ? 32 : 100));
+    const ctx = this.machine.ctx;
+    ctx.save(); ctx.font = '900 ' + size + 'px ' + style.fontFamily;
+    const measured = ctx.measureText(name.textContent).width;
+    ctx.restore();
+    if (measured > width) name.style.fontSize = Math.max(innerWidth < 600 ? 36 : 60,Math.floor(size * width / measured)) + 'px';
+  }
+  async revealWinner(winner,index,total,{quick,reduced,origin}) {
+    const stage = $('spotlight'), flight = $('capsule-flight');
+    stage.className = 'spotlight arriving';
+    stage.style.setProperty('--cap-color',PALETTE[index % PALETTE.length]);
+    $('spotlight-name').textContent = '';
+    $('spotlight-role').textContent = winner.role || 'LUCKY STAR';
+    $('spotlight-progress').textContent = total > 1 ? (index + 1) + ' / ' + total + ' 캡슐' : '오늘의 행운이 도착했어요';
+    $('result-subtitle').textContent = (index + 1) + '번째 캡슐, 착륙 준비!';
+    // 첫 캡슐은 실제 기계의 출구에서 출발해 포물선을 그리며 화면 앞으로 커진다.
+    if (!reduced) {
+      const rect = flight.getBoundingClientRect();
+      const target = {x:rect.left + rect.width / 2,y:rect.top + rect.height / 2};
+      const start = index === 0 ? origin : {x:innerWidth + 100,y:innerHeight * .3};
+      const x = start.x - target.x, y = start.y - target.y;
+      const duration = total > 8 ? (quick ? 450 : 700) : quick ? 700 : 1200;
+      const animation = flight.animate([
+        {transform:'translate(' + x + 'px,' + y + 'px) scale(.16) rotate(-300deg)',opacity:.5,offset:0},
+        {transform:'translate(' + x * .5 + 'px,' + Math.min(-120,y - 180) + 'px) scale(.65) rotate(-160deg)',opacity:1,offset:.3},
+        {transform:'translate(45px,-70px) scale(1.12) rotate(285deg)',offset:.62},
+        {transform:'translate(0,15px) scale(1.12,.86) rotate(360deg)',offset:.79},
+        {transform:'translate(0,-28px) scale(.96,1.05) rotate(360deg)',offset:.9},
+        {transform:'translate(0,0) scale(1) rotate(360deg)',offset:1}
+      ],{duration,easing:'cubic-bezier(.2,.65,.4,1)'});
+      await animation.finished.catch(() => {});
+    }
+    stage.className = 'spotlight charging';
+    this.tone(250,.15); this.tone(420,.2,.1);
+    await pause(reduced ? 25 : total > 8 ? 100 : quick ? 180 : 350);
+    $('spotlight-name').textContent = winner.label;
+    this.fitSpotlightName();
+    stage.className = 'spotlight opened';
+    $('result-subtitle').textContent = (winner.role ? winner.role + ', ' : '') + winner.label + ' 당첨!';
+    this.tone(659.25,.3); this.tone(987.77,.4,.09); this.tone(1318.5,.5,.18);
+    this.celebrate();
+    await pause(reduced ? 30 : total > 8 ? (quick ? 450 : 750) : quick ? 950 : 1600);
   }
   makeCards() {
     $('winner-cards').replaceChildren();

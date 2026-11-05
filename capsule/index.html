@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#10152e">
   <meta name="description" content="우리 반의 오늘의 주인공! 통통 튀는 우주 캡슐로 한 명, 여러 명, 역할을 뽑아요.">
   <title>우주 캡슐 뽑기 · English Class</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="app.js" defer></script>
+  <link rel="stylesheet" href="style.css?v=2">
+  <script src="app.js?v=2" defer></script>
 </head>
 <body>
   <div class="space-stars" aria-hidden="true"></div>
@@ -115,6 +115,19 @@
 
   <dialog id="result-dialog" aria-labelledby="result-title">
     <div class="result-header"><span class="eyebrow" id="result-eyebrow">MISSION COMPLETE</span><h2 id="result-title">오늘의 주인공!</h2><p id="result-subtitle" role="status" aria-live="polite">캡슐이 열리고 있어요.</p></div>
+    <div id="spotlight" class="spotlight" aria-live="off">
+      <div class="spotlight-rays" aria-hidden="true"></div>
+      <div class="landing-ring ring-one" aria-hidden="true"></div><div class="landing-ring ring-two" aria-hidden="true"></div>
+      <div class="landing-shadow" aria-hidden="true"></div>
+      <div id="capsule-flight" class="capsule-flight" aria-hidden="true">
+        <div class="flight-trail"></div>
+        <div class="hero-capsule"><div class="hero-top"><span>✦</span></div><div class="hero-bottom"></div><div class="hero-seal">★</div></div>
+      </div>
+      <div class="burst-stars" aria-hidden="true"><i>✦</i><i>✧</i><i>✦</i><i>✧</i><i>✦</i><i>✧</i></div>
+      <div class="spotlight-label" id="spotlight-role"></div>
+      <div class="spotlight-name" id="spotlight-name"></div>
+      <div class="spotlight-progress" id="spotlight-progress"></div>
+    </div>
     <div id="winner-cards" class="winner-cards"></div>
     <div class="result-actions"><button id="keep-winners" class="soft-button" type="button">명단 유지</button><button id="exclude-winners" class="launch-button" type="button">제외하고 계속 <span aria-hidden="true">↗</span></button></div>
   </dialog>

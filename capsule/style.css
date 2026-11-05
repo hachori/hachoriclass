@@ -173,3 +173,70 @@ h3>span{color:var(--mint);margin-right:5px}
 @media(max-width:780px){.topbar{height:66px;padding:0 20px}.brand{font-size:8px;letter-spacing:1px}.brand-dot,.brand-dot~*{display:none}.layout{grid-template-columns:1fr;gap:32px;padding:27px 20px 35px}.play-area{max-width:650px;margin:auto;width:100%}.control-panel{width:100%;max-width:580px;margin:0 auto}.machine-scene{height:460px;margin-top:0}.footnote{display:none}.play-options{margin-top:17px}.panel-heading{padding:24px}.settings{padding:0 24px}.mission-label{font-size:10px}.control-panel h2{font-size:22px}.history-section{padding:20px 24px}.planet-one{left:6%}.planet-two{display:block}.orbit-word{display:block;right:2%}}
 @media(max-width:420px){.brand{display:none}.topbar{padding:0 18px}.layout{padding:25px 16px 30px}h1{font-size:34px}.intro{font-size:12px}.machine-scene{height:421px;margin-bottom:0}.machine{transform:scale(.88);transform-origin:50% 100%}.mixing .machine{animation:none}.machine-scene:before{width:310px;bottom:40px}.machine-scene:after{width:280px}.planet-one{left:0%;top:15%;width:26px;height:26px}.planet-one:after{width:43px;left:-9px;top:11px}.orbit-word{display:none}.flight-status{font-size:12px}.launch-button{font-size:20px}.multi-controls{gap:7px;padding:10px}.multi-controls button{padding:10px 12px!important}.mission-label{letter-spacing:.8px;font-size:9px}.panel-heading{padding:22px 20px}.settings{padding:0 20px}.result-header h2{font-size:30px}#result-dialog{padding:30px 17px 20px;width:calc(100% - 20px);max-height:calc(100dvh - 20px);border-radius:24px}.winner-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.winner-cards.single{grid-template-columns:1fr}.winner-name{font-size:24px;padding:8px}.winner-role{font-size:12px}.winner-card{min-height:170px;padding:20px 8px}.result-actions{gap:8px;bottom:-20px}.result-actions button{padding:12px 15px!important;font-size:13px!important}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.opened .winner-name{opacity:1;transform:none}.opened .reveal-shell{display:none}.delivery-capsule{display:none}.result-header p{transition:none}}
+
+/* 교실용 큰 결과 화면과, 착륙한 뒤 열리는 캡슐. */
+body:has(#result-dialog[open]){overflow:hidden}
+.delivering .chute{box-shadow:inset 0 6px 8px #0008,0 0 25px #9df2d09c}
+#result-dialog{width:100vw;max-width:none;height:100dvh;max-height:none;inset:0;margin:0;border:0;border-radius:0;padding:28px 40px 22px;overflow:hidden;background:radial-gradient(ellipse at 50% 42%,#36305c 0,#17213f 48%,#0c122c 100%)}
+#result-dialog[open]{display:flex;flex-direction:column}
+.result-header{position:relative;z-index:5;flex-shrink:0}
+.result-header .eyebrow{font-size:12px;letter-spacing:4px}
+.result-header h2{font-size:clamp(27px,3.2vw,52px);margin:8px 0;line-height:1.2}
+.result-header p{font-size:clamp(14px,1.3vw,22px);margin:8px 0 0;min-height:28px}
+.spotlight{position:relative;flex:1;min-height:280px;width:100%;isolation:isolate;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 20px 35px}
+.spotlight-rays{position:absolute;width:max(110vw,130vh);aspect-ratio:1;top:50%;left:50%;margin-top:calc(max(110vw,130vh) / -2);margin-left:calc(max(110vw,130vh) / -2);background:repeating-conic-gradient(from 0deg,#ffce8522 0deg 9deg,transparent 9deg 27deg);mask-image:radial-gradient(circle,transparent 0 10%,#000 22%,transparent 65%);z-index:-2;opacity:0}
+.opened .spotlight-rays{opacity:1;animation:rays-turn 26s linear infinite,light-bloom .8s both}
+@keyframes rays-turn{to{rotate:360deg}}
+@keyframes light-bloom{from{opacity:0;scale:.65}to{opacity:1;scale:1}}
+.capsule-flight{position:absolute;top:50%;left:50%;margin:-95px 0 0 -95px;width:190px;height:190px;z-index:3;filter:drop-shadow(0 15px 18px #0007);perspective:900px}
+.hero-capsule{position:relative;width:100%;height:100%;transform-origin:center}
+.hero-top,.hero-bottom{position:absolute;width:100%;height:50%;border:3px solid #fff9;box-shadow:inset -16px -8px 25px #37234225;backface-visibility:hidden}
+.hero-top{top:0;border-radius:110px 110px 0 0;background:radial-gradient(ellipse at 24% 22%,#fff9 0 4%,transparent 5%),linear-gradient(135deg,#fff4,var(--cap-color,#faadc7) 46%);border-bottom:7px solid #47395c80;display:grid;place-items:center}
+.hero-top:before{content:'';position:absolute;width:40px;height:16px;top:19px;left:28px;background:#ffffffb3;border-radius:50%;transform:rotate(-30deg)}
+.hero-top>span{font-size:40px;color:#fff9;line-height:1;transform:translateY(15px)}
+.hero-bottom{bottom:0;border-radius:0 0 110px 110px;background:linear-gradient(135deg,#fff6d8,#e8dcf4 75%);border-top:4px solid #786484}
+.hero-seal{position:absolute;top:calc(50% - 20px);left:calc(50% - 20px);width:40px;height:40px;border:4px solid #fff2ce;border-radius:50%;background:#e9b764;color:#fff8df;display:grid;place-items:center;font-size:21px;box-shadow:0 2px 4px #0004;z-index:2}
+.charging .hero-capsule{animation:hero-charge .11s ease-in-out infinite alternate;filter:drop-shadow(0 0 28px #ffdc8cc9)}
+@keyframes hero-charge{from{transform:rotate(-5deg) scale(1.02)}to{transform:rotate(5deg) scale(.98,1.04)}}
+.opened .hero-top{animation:lid-fly .9s cubic-bezier(.17,.7,.2,1) forwards}
+.opened .hero-bottom{animation:base-fly .9s cubic-bezier(.17,.7,.2,1) forwards}
+.opened .hero-seal{animation:seal-pop .45s both}
+@keyframes lid-fly{0%{transform:none;opacity:1}65%{opacity:.9}100%{transform:translate(-185px,-220px) rotate(-65deg) scale(.7);opacity:0}}
+@keyframes base-fly{0%{transform:none;opacity:1}55%{opacity:.9}100%{transform:translate(180px,225px) rotate(70deg) scale(.7);opacity:0}}
+@keyframes seal-pop{to{transform:scale(3.5) rotate(150deg);opacity:0}}
+.flight-trail{position:absolute;right:75%;top:40%;width:280px;height:50px;border-radius:50%;background:linear-gradient(90deg,transparent,#f8c08877,#fff0c9);filter:blur(14px);opacity:0;transform:rotate(-18deg);z-index:-1}
+.arriving .flight-trail{opacity:.7}
+.landing-shadow{position:absolute;left:50%;top:calc(50% + 105px);width:250px;height:26px;margin-left:-125px;background:#0007;border-radius:50%;filter:blur(9px);transition:opacity .4s}
+.opened .landing-shadow{opacity:0}
+.landing-ring{position:absolute;top:50%;left:50%;width:220px;height:220px;margin:-110px 0 0 -110px;border:3px solid #ffdb9b99;border-radius:50%;opacity:0;pointer-events:none;z-index:-1}
+.opened .landing-ring{animation:shockwave 1.15s cubic-bezier(.15,.6,.2,1) both}
+.opened .ring-two{animation-delay:.17s;border-color:#9df2d0b3}
+@keyframes shockwave{0%{opacity:0;transform:scale(.45)}15%{opacity:.9}100%{opacity:0;transform:scale(4)}}
+.spotlight-label{position:absolute;top:calc(50% - 190px);left:20px;right:20px;text-align:center;font-size:clamp(22px,3vw,46px);font-weight:700;color:var(--mint);letter-spacing:2px;line-height:1.3;z-index:5;overflow-wrap:anywhere}
+.spotlight-name{font-size:clamp(72px,14vw,260px);font-weight:900;letter-spacing:-.035em;line-height:1.15;text-align:center;max-width:100%;overflow-wrap:anywhere;color:#fff3cc;text-shadow:0 6px 0 #a9624c,0 12px 35px #040719a6,0 0 60px #ffc97633;z-index:4;opacity:0;transform:scale(.55) translateY(35px);margin:0}
+.opened .spotlight-name{animation:hero-name .7s .12s cubic-bezier(.15,1.25,.25,1) forwards}
+@keyframes hero-name{to{opacity:1;transform:scale(1) translateY(0)}}
+.spotlight-progress{position:absolute;bottom:30px;left:0;right:0;text-align:center;color:#c2cbe3;font-size:clamp(13px,1.4vw,21px);letter-spacing:1px;z-index:4}
+.burst-stars{position:absolute;inset:0;pointer-events:none;z-index:2}
+.burst-stars i{position:absolute;left:50%;top:50%;font-size:40px;font-style:normal;color:#ffcf84;opacity:0;text-shadow:0 0 25px #ffcf8466}
+.burst-stars i:nth-child(1){--sx:-330px;--sy:-170px}
+.burst-stars i:nth-child(2){--sx:310px;--sy:-160px;color:#9df2d0;font-size:60px}
+.burst-stars i:nth-child(3){--sx:-400px;--sy:100px;color:#faadc7}
+.burst-stars i:nth-child(4){--sx:370px;--sy:145px}
+.burst-stars i:nth-child(5){--sx:-140px;--sy:200px;font-size:28px}
+.burst-stars i:nth-child(6){--sx:140px;--sy:-235px;color:#b5b2ed;font-size:25px}
+.opened .burst-stars i{animation:star-splash 1.2s .05s cubic-bezier(.12,.7,.2,1) both}
+@keyframes star-splash{0%{opacity:0;transform:translate(0,0) scale(0) rotate(-70deg)}30%{opacity:1}100%{opacity:0;transform:translate(var(--sx),var(--sy)) scale(1.2) rotate(90deg)}}
+.winner-cards{width:100%;max-width:1500px;min-height:0;flex:1;overflow:auto;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px;align-content:start;margin:24px auto 0;padding:10px 12px 22px;scrollbar-color:#7983a0 #17213f}
+.winner-card{min-height:210px;padding:22px 16px;border-radius:24px}
+.winner-role{font-size:clamp(21px,2.2vw,34px);margin:0 0 15px;color:var(--mint)}
+.winner-name{font-size:clamp(44px,6.5vw,112px);line-height:1.2;padding:10px 22px;border-radius:16px}
+.show-summary .winner-name{opacity:1;transform:none;animation:none}
+.show-summary .reveal-shell{display:none}
+.result-actions{position:relative;bottom:auto;flex-shrink:0;margin-top:12px;padding:14px 0 6px;background:none;z-index:5}
+.result-actions .soft-button{font-size:18px;padding:17px 28px}
+.result-actions .launch-button{font-size:21px;padding:17px 30px;border-radius:14px}
+@media(max-width:780px){#result-dialog{padding:22px 18px 18px}.spotlight{padding:20px 5px}.spotlight-label{top:calc(50% - 150px);font-size:25px}.spotlight-name{font-size:clamp(64px,16vw,125px);text-shadow:0 4px 0 #a9624c,0 8px 20px #040719a6}.winner-cards{gap:13px;padding:5px 0 15px}.winner-card{min-height:185px;padding:18px 10px}.winner-name{font-size:clamp(38px,8vw,66px);padding:9px 12px}.winner-role{font-size:22px}.burst-stars{transform:scale(.7)}}
+@media(max-width:420px){#result-dialog{width:100vw;max-height:none;padding:20px 14px 16px;border-radius:0}.result-header h2{font-size:30px}.result-header p{font-size:13px;min-height:23px}.result-header .eyebrow{font-size:9px;letter-spacing:3px}.spotlight-label{top:calc(50% - 130px);font-size:24px}.capsule-flight{width:150px;height:150px;margin:-75px 0 0 -75px}.hero-top>span{font-size:30px}.landing-shadow{top:calc(50% + 85px);width:180px;margin-left:-90px}.spotlight-progress{bottom:25px;font-size:13px}.winner-cards{grid-template-columns:1fr;gap:16px;margin-top:16px}.winner-card{min-height:160px}.winner-name{font-size:clamp(50px,15vw,68px)}.winner-role{font-size:24px}.result-actions .soft-button{font-size:14px!important;padding:15px 18px!important}.result-actions .launch-button{font-size:16px!important;padding:15px 21px!important}.burst-stars{transform:scale(.5)}}
+@media(max-height:650px) and (min-width:781px){#result-dialog{padding-top:15px;padding-bottom:12px}.result-header h2{font-size:30px}.result-header p{font-size:14px}.spotlight{min-height:220px}.spotlight-label{top:calc(50% - 125px);font-size:26px}.spotlight-name{font-size:clamp(80px,13vw,180px)}.spotlight-progress{bottom:8px}.result-actions{margin-top:0;padding:6px 0}.result-actions .launch-button,.result-actions .soft-button{font-size:16px;padding:12px 24px}.winner-card{min-height:175px}.winner-cards{margin-top:12px}}
+@media(prefers-reduced-motion:reduce){.opened .spotlight-name{opacity:1;transform:none}.opened .capsule-flight,.flight-trail,.burst-stars,.landing-ring,.spotlight-rays{display:none}.spotlight-name{opacity:0}.opened .spotlight-name{opacity:1}}
