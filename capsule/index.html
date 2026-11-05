@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#10152e">
+  <meta name="description" content="우리 반의 오늘의 주인공! 통통 튀는 우주 캡슐로 한 명, 여러 명, 역할을 뽑아요.">
+  <title>우주 캡슐 뽑기 · English Class</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="space-stars" aria-hidden="true"></div>
+  <header class="topbar">
+    <a class="back-link" href="../"><span aria-hidden="true">←</span> 교실 화면</a>
+    <span class="brand">ENGLISH CLASS <span class="brand-dot"></span> PLAY LAB</span>
+    <button id="sound" class="quiet-button" type="button" aria-pressed="true">♪ 소리 켜짐</button>
+  </header>
+  <main class="layout">
+    <section class="play-area" aria-labelledby="page-title">
+      <div class="mission-label"><span></span> TODAY'S MISSION · 오늘의 주인공 찾기</div>
+      <h1 id="page-title">우주 <span>캡슐 뽑기</span><svg viewBox="0 0 50 50" aria-hidden="true"><path d="M25 2 31 19 48 25 31 31 25 48 19 31 2 25 19 19Z"/></svg></h1>
+      <p class="intro">두근두근, 어떤 친구가 나올까요?</p>
+
+      <div class="machine-scene" id="machine-scene">
+        <span class="planet planet-one" aria-hidden="true"></span>
+        <span class="planet planet-two" aria-hidden="true"></span>
+        <span class="orbit-word" aria-hidden="true">LET'S FIND OUR STAR!</span>
+        <div class="machine" id="machine" aria-label="알록달록한 캡슐이 떠다니는 우주 캡슐 기계">
+          <div class="antenna" aria-hidden="true"><i></i></div>
+          <div class="dome">
+            <div class="dome-stars" aria-hidden="true">✦ <span>✧</span> ✦</div>
+            <canvas id="capsules" aria-hidden="true"></canvas>
+            <div class="glass-shine" aria-hidden="true"></div>
+            <div class="dome-label" aria-hidden="true">ZERO GRAVITY ZONE</div>
+          </div>
+          <div class="machine-base">
+            <div class="light-strip" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="base-front">
+              <div class="vents" aria-hidden="true"><i></i><i></i><i></i></div>
+              <div class="station-mark" aria-hidden="true"><span>✦</span> CAPSULE<br>STATION <small>NO. 03</small></div>
+              <div class="dial" aria-hidden="true">✦</div>
+            </div>
+            <div class="chute" aria-hidden="true"><div class="delivery-capsule"></div><span>READY TO LAUNCH</span></div>
+          </div>
+          <div class="machine-feet" aria-hidden="true"><i></i><i></i></div>
+        </div>
+      </div>
+
+      <div class="flight-status" id="flight-status" role="status" aria-live="polite">캡슐을 준비하고 있어요.</div>
+      <div class="launch-controls">
+        <button id="draw-one" class="launch-button" type="button"><span aria-hidden="true">✦</span> 한 명 뽑기 <span aria-hidden="true">↗</span></button>
+        <div class="multi-controls">
+          <label for="pick-count">한 번에</label>
+          <input id="pick-count" type="number" min="1" max="999" value="4" inputmode="numeric" aria-label="여러 명 뽑기 인원">
+          <span>명</span>
+          <button id="draw-many" type="button">여러 명 뽑기 <span aria-hidden="true">→</span></button>
+        </div>
+      </div>
+      <div class="play-options">
+        <label for="pace">연출 속도</label>
+        <select id="pace"><option value="normal">두근두근</option><option value="quick">빠르게</option></select>
+        <span class="keyboard-hint">Ctrl + Enter로 뽑기</span>
+      </div>
+      <p class="footnote">반짝이는 캡슐 속에, 우리 반의 다음 주인공이!</p>
+    </section>
+
+    <aside class="control-panel" aria-label="명단과 뽑기 설정">
+      <div class="panel-heading"><div><span class="eyebrow">BOARDING LIST</span><h2>우리 반 탑승 명단</h2></div><span id="pool-count" class="count-pill">0명</span></div>
+      <fieldset id="settings" class="settings">
+        <section class="panel-section">
+          <h3><span aria-hidden="true">↙</span> 자리배치 명단 불러오기</h3>
+          <div class="row"><label class="sr-only" for="class-select">반 선택</label><select id="class-select"><option value="">— 반 선택 —</option>
+<option value="3-3-영어">3-3-영어</option>
+<option value="3-4-영어">3-4-영어</option>
+<option value="4-1-영어">4-1-영어</option>
+<option value="4-2-영어">4-2-영어</option>
+<option value="4-3-영어">4-3-영어</option>
+<option value="5-1-과학">5-1-과학</option>
+<option value="5-2-과학">5-2-과학</option>
+<option value="5-3-과학">5-3-과학</option>
+<option value="6-1-과학">6-1-과학</option>
+<option value="6-2-과학">6-2-과학</option>
+<option value="6-3-과학">6-3-과학</option></select><button id="load-class" class="mint-button" type="button">불러오기</button></div>
+          <div class="filter-row"><label class="sr-only" for="gender-filter">명단 필터</label><select id="gender-filter"><option value="all">전체</option><option value="male">남학생만</option><option value="female">여학생만</option></select><label class="check"><input type="checkbox" id="strip-number" checked> 번호 빼고 이름만</label></div>
+          <p id="load-status" class="hint" role="status">자리배치에 저장한 명단을 불러와요.</p>
+        </section>
+        <section class="panel-section">
+          <div class="section-heading"><h3><label for="names">참가할 친구들</label></h3><span class="hint">한 줄에 한 명씩</span></div>
+          <textarea id="names" rows="5" spellcheck="false">1모둠
+2모둠
+3모둠
+4모둠
+5모둠
+6모둠</textarea>
+          <div class="row"><button id="apply-names" class="soft-button" type="button">명단 적용</button><button id="clear-names" class="text-button" type="button">비우기</button></div>
+          <label class="check remove-check"><input type="checkbox" id="remove-winners" checked> 당첨 후 명단에서 제외</label>
+          <p id="names-status" class="hint" role="status">명단을 고친 뒤 ‘명단 적용’을 눌러 주세요.</p>
+        </section>
+        <section class="panel-section role-section">
+          <label class="role-toggle" for="role-mode"><span><span aria-hidden="true">✧</span> 역할 배정 모드</span><input type="checkbox" id="role-mode" role="switch"></label>
+          <div id="role-box" hidden>
+            <label class="sr-only" for="roles">배정할 역할</label>
+            <textarea id="roles" rows="4" placeholder="왕&#10;신하 x3&#10;농부"></textarea>
+            <p class="hint">‘신하 x3’처럼 쓰면 같은 역할을 3명에게 배정해요.</p>
+            <div class="row presets"><label class="sr-only" for="preset-select">저장한 역할 세트</label><select id="preset-select"><option value="">저장한 역할 세트</option></select><button id="save-preset" class="icon-button" type="button" title="역할 세트 저장" aria-label="역할 세트 저장">＋</button><button id="delete-preset" class="icon-button" type="button" title="선택한 역할 세트 삭제" aria-label="선택한 역할 세트 삭제">−</button></div>
+            <p id="role-status" class="role-summary"></p>
+          </div>
+        </section>
+      </fieldset>
+      <details class="history-section"><summary>뽑기 기록 <span id="history-count">0</span></summary><ol id="history-list"><li class="empty-history">첫 번째 주인공을 뽑아 보세요.</li></ol></details>
+      <div class="panel-footer"><span aria-hidden="true">✦</span> 명단은 이 화면에서만 바뀌어요.</div>
+    </aside>
+  </main>
+
+  <dialog id="result-dialog" aria-labelledby="result-title">
+    <div class="result-header"><span class="eyebrow" id="result-eyebrow">MISSION COMPLETE</span><h2 id="result-title">오늘의 주인공!</h2><p id="result-subtitle" role="status" aria-live="polite">캡슐이 열리고 있어요.</p></div>
+    <div id="winner-cards" class="winner-cards"></div>
+    <div class="result-actions"><button id="keep-winners" class="soft-button" type="button">명단 유지</button><button id="exclude-winners" class="launch-button" type="button">제외하고 계속 <span aria-hidden="true">↗</span></button></div>
+  </dialog>
+  <canvas id="confetti" aria-hidden="true"></canvas>
+</body>
+</html>
+
