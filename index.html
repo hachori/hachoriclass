@@ -382,6 +382,39 @@
         .role-pair .winner-tag, .role-pair .dummy-tag { font-size: 1.5rem; padding: 4px 16px; }
         .role-pair .dummy-tag { animation: none; }
 
+        .roulette-reveal-control { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 0.9rem; }
+        .roulette-reveal-control input { width: 68px; padding: 8px; border: 1px solid #555; border-radius: 8px; background: #0f3460; color: #fff; text-align: center; font-size: 1rem; }
+        .roulette-reveal-control input:disabled { opacity: 0.5; }
+        #roulette-modal.sequence-view { background: #0b1024f5; }
+        .sequence-view .roulette-modal-box {
+            width: min(1200px, calc(100vw - 32px)); max-width: none; min-height: min(620px, 85vh);
+            display: flex; flex-direction: column; justify-content: center; padding: 30px; box-sizing: border-box;
+        }
+        .roulette-spotlight { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; width: 100%; padding: 20px 0; }
+        .roulette-spotlight[hidden], #roulette-winnerText[hidden], #roulette-reveal-progress[hidden], #roulette-spotlight-role[hidden] { display: none; }
+        #roulette-spotlight-role { color: #b7c9ff; font-size: clamp(24px, 3.5vw, 54px); font-weight: 700; overflow-wrap: anywhere; }
+        #roulette-spotlight-name {
+            width: 100%; color: #ffd479; font-size: clamp(72px, 14vw, 240px); font-weight: 900;
+            line-height: 1.25; overflow-wrap: anywhere; text-shadow: 0 6px 0 #7d3700, 0 0 50px #f0a50040;
+        }
+        .roulette-spotlight.revealing #roulette-spotlight-name { animation: rouletteNameReveal 0.45s ease-out both; }
+        #roulette-reveal-progress { color: #a8b2d3; font-size: clamp(18px, 2vw, 28px); margin-top: 20px; }
+        @keyframes rouletteNameReveal { from { opacity: 0; transform: scale(0.72); } to { opacity: 1; transform: scale(1); } }
+        .summary-view .roulette-modal-box { width: min(1200px, calc(100vw - 32px)); max-width: none; padding: 24px; box-sizing: border-box; }
+        .summary-view #roulette-winnerText { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; max-height: 58vh; overflow-y: auto; padding: 8px; }
+        .summary-view .winner-tag { display: block; font-size: clamp(30px, 4.5vw, 72px); padding: 12px 18px; border-radius: 16px; overflow-wrap: anywhere; }
+        .summary-view .role-pair { flex-direction: column; justify-content: center; min-width: 0; }
+        .summary-view .role-name { font-size: clamp(22px, 2.4vw, 36px); text-align: center; white-space: normal; overflow-wrap: anywhere; }
+        .summary-view .role-arrow { display: none; }
+        @media (max-width: 600px) {
+            .sequence-view .roulette-modal-box { padding: 20px 12px; }
+            .summary-view #roulette-winnerText { grid-template-columns: minmax(0, 1fr); }
+            .summary-view .roulette-modal-box { padding: 16px 10px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .roulette-spotlight.revealing #roulette-spotlight-name, .roulette-modal-box, .winner-tag, .role-pair { animation: none; }
+        }
+
         /* 태블릿 세로 화면 대응 */
         @media (max-aspect-ratio: 4/5) {
             #widget-roulette .widget-content {
@@ -656,6 +689,14 @@
                 </div>
 
                 <div class="roulette-section">
+                    <label class="roulette-reveal-control" for="roulette-reveal-seconds">
+                        <span>한 명당 이름 표시</span>
+                        <span><input id="roulette-reveal-seconds" type="number" min="1" max="30" step="1" value="3" inputmode="numeric" aria-describedby="roulette-reveal-hint"> 초</span>
+                    </label>
+                    <p id="roulette-reveal-hint" class="roulette-hint">여러 명·역할 배정 시, 이름이 완전히 나타난 뒤 기다리는 시간 (1~30초)</p>
+                </div>
+
+                <div class="roulette-section">
                     <h2>📋 항목 입력 (한 줄에 하나)</h2>
                     <textarea id="roulette-names">1모둠
 2모둠
@@ -702,9 +743,14 @@
     </div>
 
     <!-- 결과 모달 -->
-    <div id="roulette-modal">
+    <div id="roulette-modal" role="dialog" aria-modal="true" aria-labelledby="roulette-result-title" tabindex="-1">
         <div class="roulette-modal-box">
-            <h2>🎉 당첨!</h2>
+            <h2 id="roulette-result-title">🎉 당첨!</h2>
+            <div id="roulette-spotlight" class="roulette-spotlight" aria-live="polite" aria-atomic="true" hidden>
+                <div id="roulette-spotlight-role" hidden></div>
+                <div id="roulette-spotlight-name"></div>
+            </div>
+            <div id="roulette-reveal-progress" hidden></div>
             <p id="roulette-winnerText"></p>
             <div class="roulette-modal-btn-row">
                 <button class="roulette-btn-keep" onclick="RouletteApp.closeModal(false)">유지</button>
@@ -1018,6 +1064,7 @@
                     .catch(error => console.warn('룰렛 폰트 로딩 실패:', error));
 
                 this.restore();
+                document.getElementById('roulette-reveal-seconds').value = this.nameHoldSeconds();
                 this.refreshPresets();
                 this.onRoleToggle(true);
                 this.applyNames({ silent: true });
@@ -1028,6 +1075,10 @@
                     document.getElementById(id).addEventListener('input', () => this.saveSoon());
                 });
                 document.getElementById('roulette-classSelect').addEventListener('change', () => this.save());
+                document.getElementById('roulette-reveal-seconds').addEventListener('change', () => {
+                    document.getElementById('roulette-reveal-seconds').value = this.nameHoldSeconds();
+                    this.save();
+                });
 
                 document.addEventListener('keydown', e => {
                     const widget = document.getElementById('widget-roulette');
@@ -1038,7 +1089,7 @@
                 });
 
                 let rt = null;
-                window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => this.resizeCanvas(), 150); });
+                window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { this.resizeCanvas(); this.fitSpotlightName(); }, 150); });
             },
 
             /* ───────── 작은 도구들 ───────── */
@@ -1061,6 +1112,12 @@
 
             isBusy: function() { return this.spinning || this.pickingMultiple; },
 
+            nameHoldSeconds: function() {
+                const raw = document.getElementById('roulette-reveal-seconds').value;
+                const value = raw.trim() === '' ? 3 : Number(raw);
+                return Number.isFinite(value) ? Math.max(1, Math.min(30, Math.round(value))) : 3;
+            },
+
             /* 돌아가는 중에 명단을 갈아끼우면 엉뚱한 사람이 뽑히거나 빠진다 */
             guardBusy: function() {
                 if (!this.isBusy()) return false;
@@ -1080,7 +1137,8 @@
                         strip:  document.getElementById('roulette-stripNum').checked,
                         role:   document.getElementById('roulette-roleToggle').checked,
                         remove: document.getElementById('roulette-removeToggle').checked,
-                        count:  document.getElementById('multi-pick-count').value
+                        count:  document.getElementById('multi-pick-count').value,
+                        revealSeconds: this.nameHoldSeconds()
                     }));
                 } catch (e) { /* 사생활 보호 모드 등 — 저장 못 해도 동작엔 지장 없다 */ }
             },
@@ -1100,6 +1158,7 @@
                 set('roulette-classSelect', s.cls);
                 set('roulette-genderFilter', s.gender);
                 set('multi-pick-count', s.count);
+                set('roulette-reveal-seconds', s.revealSeconds);
                 set('roulette-stripNum', s.strip, 'checked');
                 set('roulette-roleToggle', s.role, 'checked');
                 set('roulette-removeToggle', s.remove, 'checked');
@@ -1307,6 +1366,7 @@
                 document.getElementById('roulette-countNum').textContent = this.segments.length;
                 document.getElementById('roulette-spinBtn').disabled = empty || busy;
                 document.querySelector('.multi-pick-btn').disabled = empty || busy;
+                document.getElementById('roulette-reveal-seconds').disabled = busy;
                 document.getElementById('roulette-emptyMsg').style.display = empty ? 'block' : 'none';
                 document.getElementById('roulette-countBadge').style.display = empty ? 'none' : 'block';
                 const removeBtn = document.getElementById('roulette-removeBtn');
@@ -1428,6 +1488,10 @@
 
                 this.initAudio();
                 this.pickingMultiple = true;
+                this.revealHoldMs = this.nameHoldSeconds() * 1000;
+                document.getElementById('roulette-reveal-seconds').value = this.revealHoldMs / 1000;
+                this.save();
+                this.stopIdle();
                 this.updateUI();
 
                 // 진짜 결과는 미리 확정해 둔다 — 화면 연출과는 무관하게
@@ -1440,63 +1504,87 @@
             /* 뽑는 중 명단이 바뀌어도 터지지 않도록 라벨을 미리 복사해 둔다 */
             runSuspense: function(roleMode) {
                 const labels = this.segments.map(s => s.label);
-                const count = this.lastWinners.length;
                 const textEl = document.getElementById('roulette-winnerText');
-
-                document.getElementById('roulette-modal').classList.add('show');
+                const modal = document.getElementById('roulette-modal');
+                modal.classList.remove('summary-view');
+                modal.classList.add('show', 'sequence-view');
+                modal.focus();
+                document.getElementById('roulette-spotlight').hidden = true;
+                document.getElementById('roulette-reveal-progress').hidden = true;
                 document.querySelector('.roulette-modal-btn-row').style.display = 'none';
                 document.querySelector('.roulette-modal-box h2').innerHTML = roleMode ? '🎭 역할을 정하는 중...' : '🕹️ 타겟을 찾는 중...';
-                textEl.className = roleMode ? 'pairs' : '';
+                textEl.className = '';
+                textEl.hidden = false;
+                textEl.textContent = '';
 
                 let ticks = 0;
-                const maxTicks = roleMode ? 12 : 25;   // 역할 모드는 뒤에 순차 공개가 이어진다
+                const maxTicks = matchMedia('(prefers-reduced-motion: reduce)').matches ? 2 : roleMode ? 12 : 25;
                 const iv = setInterval(() => {
                     ticks++;
-                    const picks = this.shuffle(labels).slice(0, count);
-                    textEl.innerHTML = roleMode
-                        ? this.lastWinners.map((w, i) =>
-                            `<div class="role-pair"><span class="role-name">${this.esc(w.role)}</span>`
-                            + `<span class="role-arrow">→</span><span class="dummy-tag">${this.esc(picks[i] || '???')}</span></div>`).join('')
-                        : picks.map(p => `<span class="dummy-tag">${this.esc(p)}</span>`).join('');
+                    const pick = labels[Math.floor(Math.random() * labels.length)];
+                    textEl.innerHTML = `<span class="dummy-tag">${this.esc(pick || '???')}</span>`;
                     this.playSuspenseTick();
 
                     if (ticks >= maxTicks) {
                         clearInterval(iv);
-                        if (roleMode) { this.revealRolesOneByOne(); }
-                        else { this.pickingMultiple = false; this.showResultModal(); }
+                        this.revealWinnersOneByOne();
                     }
                 }, 100);
             },
 
-            /* 역할은 하나씩 공개해야 교실 반응이 산다 */
-            revealRolesOneByOne: function() {
-                const textEl = document.getElementById('roulette-winnerText');
-                let shown = 0;
-                const step = () => {
-                    textEl.innerHTML = this.lastWinners.map((w, i) => {
-                        const right = i < shown
-                            ? `<span class="winner-tag">${this.esc(w.label)}</span>`
-                            : '<span class="dummy-tag">???</span>';
-                        return `<div class="role-pair"><span class="role-name">${this.esc(w.role)}</span>`
-                             + `<span class="role-arrow">→</span>${right}</div>`;
-                    }).join('');
-                    if (shown > 0) this.playReveal();
-                    if (shown >= this.lastWinners.length) {
-                        this.pickingMultiple = false;
-                        this.showResultModal();
-                        return;
-                    }
-                    shown++;
-                    setTimeout(step, 700);
-                };
-                step();
+            fitSpotlightName: function() {
+                const name = document.getElementById('roulette-spotlight-name');
+                if (document.getElementById('roulette-spotlight').hidden || !name.clientWidth) return;
+                name.style.fontSize = '';
+                const size = parseFloat(getComputedStyle(name).fontSize);
+                const ctx = this.nameMeasureContext || (this.nameMeasureContext = document.createElement('canvas').getContext('2d'));
+                ctx.font = `900 ${size}px 'A2Z', 'Noto Sans KR', sans-serif`;
+                const width = ctx.measureText(name.textContent).width;
+                if (width > name.clientWidth - 20) name.style.fontSize = Math.max(40, size * (name.clientWidth - 20) / width) + 'px';
+            },
+
+            /* 이름이 완전히 나타난 뒤, 설정한 시간만큼 한 명씩 보여 준다. */
+            revealWinnersOneByOne: async function() {
+                try { await document.fonts.load("900 48px 'A2Z'"); } catch (e) { /* 기본 글꼴로도 계속한다. */ }
+                const spotlight = document.getElementById('roulette-spotlight');
+                const role = document.getElementById('roulette-spotlight-role');
+                const name = document.getElementById('roulette-spotlight-name');
+                const progress = document.getElementById('roulette-reveal-progress');
+                document.getElementById('roulette-winnerText').hidden = true;
+                spotlight.hidden = false;
+                progress.hidden = false;
+                document.getElementById('roulette-result-title').textContent = this.lastWinners.some(w => w.role) ? '🎭 오늘의 역할 주인공' : '🎉 오늘의 주인공';
+                for (let i = 0; i < this.lastWinners.length; i++) {
+                    const winner = this.lastWinners[i];
+                    spotlight.classList.remove('revealing');
+                    role.textContent = winner.role || '';
+                    role.hidden = !winner.role;
+                    name.textContent = winner.label;
+                    progress.textContent = `${i + 1} / ${this.lastWinners.length}명 공개`;
+                    this.fitSpotlightName();
+                    void spotlight.offsetWidth;
+                    spotlight.classList.add('revealing');
+                    this.playReveal();
+                    // 등장 효과가 끝난 뒤부터 읽는 시간을 센다. 동작 줄이기에서도 대기 시간은 같다.
+                    await Promise.all(name.getAnimations().map(animation => animation.finished.catch(() => {})));
+                    await new Promise(resolve => setTimeout(resolve, this.revealHoldMs));
+                }
+                this.pickingMultiple = false;
+                this.showResultModal();
             },
 
             /* ───────── 결과 ───────── */
 
             showResultModal: function() {
                 const roleMode = this.lastWinners.some(w => w.role);
+                const modal = document.getElementById('roulette-modal');
+                modal.classList.remove('sequence-view');
+                modal.classList.toggle('summary-view', this.lastWinners.length > 1);
+                document.getElementById('roulette-spotlight').hidden = true;
+                document.getElementById('roulette-spotlight').classList.remove('revealing');
+                document.getElementById('roulette-reveal-progress').hidden = true;
                 const textEl = document.getElementById('roulette-winnerText');
+                textEl.hidden = false;
                 textEl.className = roleMode ? 'pairs' : '';
                 textEl.innerHTML = roleMode
                     ? this.lastWinners.map((w, i) =>
@@ -1519,6 +1607,7 @@
                 this.playTada();
                 this.updateUI();
                 document.getElementById('roulette-modal').classList.add('show');
+                document.querySelector('.roulette-btn-keep').focus();
             },
 
             /* 인덱스가 아니라 id로 지운다 — 도중에 명단이 바뀌어도 엉뚱한 사람이 빠지지 않는다 */
