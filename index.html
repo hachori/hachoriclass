@@ -473,28 +473,31 @@
         }
 
         /* Keep the classroom alive beneath the capsule tool. */
-        #capsule-overlay {
+        .classroom-overlay {
             position: fixed; inset: 0; margin: 0; padding: 0; border: 0;
             width: 100vw; height: 100vh; height: 100dvh; max-width: none; max-height: none;
             background: #10152e; color: #edf3ff; font-family: 'A2Z', sans-serif;
             overflow: hidden; box-sizing: border-box;
         }
-        #capsule-overlay[open] { display: flex; flex-direction: column; }
+        .classroom-overlay[open] { display: flex; flex-direction: column; }
         .capsule-overlay-bar {
             display: flex; align-items: center; justify-content: space-between; gap: 12px;
             min-height: 52px; padding: 8px 16px; box-sizing: border-box;
             border-bottom: 1px solid #ffffff20; flex-shrink: 0;
         }
         .capsule-overlay-bar strong { font-size: 16px; font-weight: 700; }
-        #capsule-close {
+        .overlay-close {
             display: flex; align-items: center; gap: 12px; padding: 7px 14px;
             border: 1px solid #ffffff40; border-radius: 10px; background: #ffffff12;
             color: inherit; font: inherit; font-size: 14px; cursor: pointer;
         }
-        #capsule-close:hover { background: #ffffff25; }
-        #capsule-close:focus-visible { outline: 3px solid #9ce7d5; outline-offset: 2px; }
-        #capsule-close span { font-size: 22px; line-height: 1; }
-        #capsule-frame { display: block; flex: 1 1 0; width: 100%; min-height: 0; border: 0; background: #10152e; }
+        .overlay-close:hover { background: #ffffff25; }
+        .overlay-close:focus-visible { outline: 3px solid #9ce7d5; outline-offset: 2px; }
+        .overlay-close span { font-size: 22px; line-height: 1; }
+        .classroom-frame { display: block; flex: 1 1 0; width: 100%; min-height: 0; border: 0; background: #10152e; }
+        #memo-overlay, #memo-frame { background: #f5f5ef; color: #263f40; }
+        #memo-overlay .capsule-overlay-bar { border-color: #e3e7dc; }
+        #memo-close { border-color: #c9d4c2; background: #e9efdf; }
         #capsule-loading { position: absolute; inset: 56px 0 0; display: grid; place-items: center; margin: 0; background: #10152e; pointer-events: none; }
         #capsule-loading[hidden] { display: none; }
 
@@ -510,6 +513,12 @@
         .tool-btn.active { color: #4F46E5; background-color: #EEF2FF; }
         .tool-btn i { font-size: 1.5rem; margin-bottom: 5px; }
         .tool-btn span { font-size: 0.75rem; font-weight: 700; }
+        @media (max-width: 600px) {
+            .toolbar-group { width: calc(100vw - 16px); gap: 2px; padding: 6px; }
+            .tool-btn { flex: 1 1 0; min-width: 0; width: 48px; height: 58px; }
+            .tool-btn i { font-size: 1.3rem; }
+            .tool-btn span { font-size: 10px; white-space: nowrap; }
+        }
 
         /* --- Background Selector --- */
         .bg-selector-container { position: absolute; top: 20px; right: 20px; z-index: 1000; }
@@ -780,13 +789,21 @@
         </div>
     </div>
 
-    <dialog id="capsule-overlay" aria-label="우주 캡슐 뽑기">
+    <dialog id="capsule-overlay" class="classroom-overlay" aria-label="우주 캡슐 뽑기">
         <div class="capsule-overlay-bar">
             <strong>우주 캡슐 뽑기</strong>
-            <button id="capsule-close" type="button" onclick="closeCapsule()" autofocus>닫기 <span aria-hidden="true">×</span></button>
+            <button id="capsule-close" class="overlay-close" type="button" onclick="closeCapsule()" autofocus>닫기 <span aria-hidden="true">×</span></button>
         </div>
         <p id="capsule-loading" role="status">우주 캡슐을 여는 중…</p>
-        <iframe id="capsule-frame" title="우주 캡슐 뽑기 화면"></iframe>
+        <iframe id="capsule-frame" class="classroom-frame" title="우주 캡슐 뽑기 화면"></iframe>
+    </dialog>
+
+    <dialog id="memo-overlay" class="classroom-overlay" aria-label="메모">
+        <div class="capsule-overlay-bar">
+            <strong>나의 교실 메모</strong>
+            <button id="memo-close" class="overlay-close" type="button" onclick="closeMemo()" autofocus>닫기 <span aria-hidden="true">×</span></button>
+        </div>
+        <iframe id="memo-frame" class="classroom-frame" title="할 일, 메모와 링크"></iframe>
     </dialog>
 
     <!-- Dock Toggle Button -->
@@ -798,6 +815,7 @@
             <button id="btn-clock" class="tool-btn" onclick="toggleWidget('widget-clock', 'btn-clock')"><i class="far fa-clock"></i><span>시계</span></button>
             <button id="btn-timer" class="tool-btn" onclick="toggleWidget('widget-timer', 'btn-timer')"><i class="fas fa-hourglass-half"></i><span>타이머</span></button>
             <button id="btn-note" class="tool-btn" onclick="toggleWidget('widget-note', 'btn-note')"><i class="fas fa-book-open"></i><span>영어노트</span></button>
+            <button id="btn-memo" class="tool-btn" type="button" onclick="openMemo()"><i class="fas fa-list-check" aria-hidden="true"></i><span>메모</span></button>
             <button id="btn-roulette" class="tool-btn" type="button" onclick="toggleDrawChooser()" aria-controls="draw-chooser" aria-expanded="false"><i class="fas fa-dharmachakra" aria-hidden="true"></i><span>룰렛</span></button>
             <button id="btn-ebook" class="tool-btn" onclick="toggleEbookPopup()"><i class="fas fa-tablet-alt"></i><span>E-book</span></button>
             <button id="btn-seat" class="tool-btn" onclick="window.open('https://hachori.github.io/seat/v2', '_blank')"><i class="fas fa-chair"></i><span>자리배치</span></button>
@@ -1010,6 +1028,29 @@
                     event.preventDefault(); closeCapsule();
                 }
             });
+        });
+        function openMemo() {
+            closeDrawChooser();
+            document.getElementById('ebook-popup').classList.remove('show');
+            document.getElementById('btn-ebook').classList.remove('active');
+            const overlay = document.getElementById('memo-overlay'), frame = document.getElementById('memo-frame');
+            if (overlay.open) return;
+            overlay.showModal(); document.getElementById('btn-memo').classList.add('active');
+            if (!frame.hasAttribute('src')) frame.src = 'memo/?classroom=1';
+            else frame.contentWindow.postMessage({type:'hachoriclass:memo-visible',visible:true},location.origin);
+        }
+        function closeMemo() {
+            const overlay = document.getElementById('memo-overlay');
+            if (overlay.open) overlay.close();
+        }
+        document.getElementById('memo-overlay').addEventListener('close',() => {
+            // Keep the memo loaded until its queued cloud writes finish.
+            document.getElementById('memo-frame').contentWindow.postMessage({type:'hachoriclass:memo-visible',visible:false},location.origin);
+            document.getElementById('btn-memo').classList.remove('active');
+            document.getElementById('btn-memo').focus();
+        });
+        window.addEventListener('message',event => {
+            if (event.origin === location.origin && event.source === document.getElementById('memo-frame').contentWindow && event.data?.type === 'hachoriclass:memo-close') closeMemo();
         });
         function dismissDrawChooserOutside(event) {
             const chooser = document.getElementById('draw-chooser');
