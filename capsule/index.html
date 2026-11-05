@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#10152e">
   <meta name="description" content="우리 반의 오늘의 주인공! 통통 튀는 우주 캡슐로 한 명, 여러 명, 역할을 뽑아요.">
   <title>우주 캡슐 뽑기 · English Class</title>
-  <link rel="stylesheet" href="style.css?v=2">
-  <script src="app.js?v=2" defer></script>
+  <link rel="stylesheet" href="style.css?v=3">
+  <script src="app.js?v=3" defer></script>
 </head>
 <body>
   <div class="space-stars" aria-hidden="true"></div>
@@ -61,6 +61,11 @@
         <label for="pace">연출 속도</label>
         <select id="pace"><option value="normal">두근두근</option><option value="quick">빠르게</option></select>
         <span class="keyboard-hint">Ctrl + Enter로 뽑기</span>
+      </div>
+      <div class="reveal-options">
+        <label for="reveal-seconds">한 명당 이름 표시</label>
+        <div class="seconds-input"><input id="reveal-seconds" type="number" min="1" max="30" step="1" value="3" inputmode="numeric" aria-describedby="reveal-time-hint"><span>초</span></div>
+        <p id="reveal-time-hint">여러 명·역할 배정 시, 이름이 완전히 나타난 뒤 기다리는 시간 (1~30초)</p>
       </div>
       <p class="footnote">반짝이는 캡슐 속에, 우리 반의 다음 주인공이!</p>
     </section>

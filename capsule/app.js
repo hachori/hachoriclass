@@ -154,6 +154,7 @@ class CapsuleGame {
     $('roles').addEventListener('input', () => { this.updateUI(); this.save(); });
     $('names').addEventListener('input', () => { $('names-status').textContent = '고친 명단을 사용하려면 ‘명단 적용’을 눌러 주세요.'; this.save(); });
     ['class-select','gender-filter','strip-number','remove-winners','pick-count','pace'].forEach(id => $(id).addEventListener('change', () => this.save()));
+    $('reveal-seconds').addEventListener('change', () => { $('reveal-seconds').value = this.nameHoldSeconds(); this.save(); });
     $('preset-select').addEventListener('change', () => this.loadPreset());
     $('save-preset').addEventListener('click', () => this.savePreset());
     $('delete-preset').addEventListener('click', () => this.deletePreset());
@@ -174,12 +175,13 @@ class CapsuleGame {
     const own = storage.json(this.key);
     const saved = own && typeof own === 'object' && !Array.isArray(own) ? own : storage.json('englishclass_roulette_v2');
     if (saved && typeof saved === 'object') {
-      const fields = {'names':'names','roles':'roles','class-select':'cls','gender-filter':'gender','pick-count':'count','pace':'pace'};
+      const fields = {'names':'names','roles':'roles','class-select':'cls','gender-filter':'gender','pick-count':'count','pace':'pace','reveal-seconds':'revealSeconds'};
       Object.entries(fields).forEach(([id, prop]) => { if (typeof saved[prop] === 'string' || typeof saved[prop] === 'number') $(id).value = saved[prop]; });
       [['strip-number','strip'],['role-mode','role'],['remove-winners','remove']].forEach(([id, prop]) => { if (typeof saved[prop] === 'boolean') $(id).checked = saved[prop]; });
       if (typeof saved.sound === 'boolean') this.sound = saved.sound;
     }
     if (!['normal','quick'].includes($('pace').value)) $('pace').value = 'normal';
+    $('reveal-seconds').value = this.nameHoldSeconds();
     const names = own && Array.isArray(own.pool) ? own.pool.filter(n => typeof n === 'string' && n.trim()) : this.readNames();
     this.pool = names.map(label => ({id:++this.seq,label}));
     if (own && Array.isArray(own.history)) this.history = own.history.filter(h => Array.isArray(h) && h.every(w => w && typeof w.label === 'string' && (w.role === null || typeof w.role === 'string'))).slice(0, 30);
@@ -191,11 +193,16 @@ class CapsuleGame {
       cls:$('class-select').value, gender:$('gender-filter').value,
       strip:$('strip-number').checked, role:$('role-mode').checked,
       remove:$('remove-winners').checked, count:$('pick-count').value,
-      pace:$('pace').value, sound:this.sound,
+      pace:$('pace').value, sound:this.sound, revealSeconds:this.nameHoldSeconds(),
       pool:this.pool.map(n => n.label), history:this.history
     }));
   }
   readNames() { return $('names').value.split('\n').map(n => n.trim()).filter(Boolean); }
+  nameHoldSeconds() {
+    const value = $('reveal-seconds').value.trim();
+    const seconds = Number(value);
+    return value && Number.isFinite(seconds) ? Math.min(30,Math.max(1,Math.round(seconds))) : 3;
+  }
   applyNames() {
     if (this.phase !== 'idle') return;
     const names = this.readNames();
@@ -244,6 +251,7 @@ class CapsuleGame {
     $('pool-count').textContent = this.pool.length + '명';
     $('pick-count').disabled = !idle || roleMode;
     $('pace').disabled = !idle;
+    $('reveal-seconds').disabled = !idle;
     $('draw-one').disabled = !idle || !this.pool.length;
     $('draw-many').disabled = !idle || !this.pool.length || roleMode;
     $('draw-one').replaceChildren(document.createTextNode(!idle ? (this.phase === 'loading' ? '명단 불러오는 중…' : '캡슐 탐사 중…') : roleMode ? '✧ 역할 배정하기 ↗' : '✦ 한 명 뽑기 ↗'));
@@ -384,6 +392,8 @@ class CapsuleGame {
     // 이 시점에 결과를 확정한다. 뒤의 물리 효과와 공개 순서는 결과를 바꾸지 않는다.
     this.lastWinners = this.sample(count).map((person,i) => ({...person,role:roleMode ? roles[i] : null}));
     const quick = $('pace').value === 'quick';
+    const holdMs = this.nameHoldSeconds() * 1000;
+    $('reveal-seconds').value = holdMs / 1000;
     const reduced = this.motion.matches;
     this.phase = 'mixing'; this.updateUI(); this.save(); this.initAudio();
     $('machine-scene').classList.add('mixing'); this.machine.active = true;
@@ -412,7 +422,7 @@ class CapsuleGame {
     $('result-dialog').scrollTop = 0;
     $('result-dialog').append($('confetti'));
     for (let i = 0; i < cards.length; i++) {
-      await this.revealWinner(this.lastWinners[i],i,count,{quick,reduced,origin:launchOrigin});
+      await this.revealWinner(this.lastWinners[i],i,count,{quick,reduced,holdMs,origin:launchOrigin});
       cards[i].querySelector('.winner-name').textContent = this.lastWinners[i].label;
       cards[i].classList.add('opened');
       cards[i].setAttribute('aria-label',(this.lastWinners[i].role ? this.lastWinners[i].role + ': ' : '') + this.lastWinners[i].label);
@@ -447,7 +457,7 @@ class CapsuleGame {
     ctx.restore();
     if (measured > width) name.style.fontSize = Math.max(innerWidth < 600 ? 36 : 60,Math.floor(size * width / measured)) + 'px';
   }
-  async revealWinner(winner,index,total,{quick,reduced,origin}) {
+  async revealWinner(winner,index,total,{quick,reduced,holdMs,origin}) {
     const stage = $('spotlight'), flight = $('capsule-flight');
     stage.className = 'spotlight arriving';
     stage.style.setProperty('--cap-color',PALETTE[index % PALETTE.length]);
@@ -481,7 +491,9 @@ class CapsuleGame {
     $('result-subtitle').textContent = (winner.role ? winner.role + ', ' : '') + winner.label + ' 당첨!';
     this.tone(659.25,.3); this.tone(987.77,.4,.09); this.tone(1318.5,.5,.18);
     this.celebrate();
-    await pause(reduced ? 30 : total > 8 ? (quick ? 450 : 750) : quick ? 950 : 1600);
+    // .12초 지연 + .7초 등장 효과가 끝난 뒤, 설정한 시간을 온전히 보여 준다.
+    // 빠른 연출·많은 인원·동작 줄이기에서도 이름을 읽는 시간은 줄이지 않는다.
+    await pause(total > 1 ? holdMs + (reduced ? 0 : 820) : reduced ? 30 : quick ? 950 : 1600);
   }
   makeCards() {
     $('winner-cards').replaceChildren();
