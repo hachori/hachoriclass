@@ -439,6 +439,32 @@
             .draw-choice { transition: none; }
         }
 
+        /* Keep the classroom alive beneath the capsule tool. */
+        #capsule-overlay {
+            position: fixed; inset: 0; margin: 0; padding: 0; border: 0;
+            width: 100vw; height: 100vh; height: 100dvh; max-width: none; max-height: none;
+            background: #10152e; color: #edf3ff; font-family: 'A2Z', sans-serif;
+            overflow: hidden; box-sizing: border-box;
+        }
+        #capsule-overlay[open] { display: flex; flex-direction: column; }
+        .capsule-overlay-bar {
+            display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            min-height: 52px; padding: 8px 16px; box-sizing: border-box;
+            border-bottom: 1px solid #ffffff20; flex-shrink: 0;
+        }
+        .capsule-overlay-bar strong { font-size: 16px; font-weight: 700; }
+        #capsule-close {
+            display: flex; align-items: center; gap: 12px; padding: 7px 14px;
+            border: 1px solid #ffffff40; border-radius: 10px; background: #ffffff12;
+            color: inherit; font: inherit; font-size: 14px; cursor: pointer;
+        }
+        #capsule-close:hover { background: #ffffff25; }
+        #capsule-close:focus-visible { outline: 3px solid #9ce7d5; outline-offset: 2px; }
+        #capsule-close span { font-size: 22px; line-height: 1; }
+        #capsule-frame { display: block; flex: 1 1 0; width: 100%; min-height: 0; border: 0; background: #10152e; }
+        #capsule-loading { position: absolute; inset: 56px 0 0; display: grid; place-items: center; margin: 0; background: #10152e; pointer-events: none; }
+        #capsule-loading[hidden] { display: none; }
+
         /* --- Bottom Toolbar --- */
         .toolbar-container { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 1000; }
         .toolbar-group { background-color: rgba(255, 255, 255, 0.95); padding: 10px; border-radius: 1rem; box-shadow: 0 5px 20px rgba(0,0,0,0.15); display: flex; gap: 10px; }
@@ -702,11 +728,20 @@
             <button id="btn-classic-roulette" class="draw-choice" type="button" onclick="openClassicRoulette()">
                 <i class="fas fa-dharmachakra" aria-hidden="true"></i><strong>일반 룰렛</strong><small>빙글빙글 돌려 뽑기</small>
             </button>
-            <button id="btn-capsule" class="draw-choice capsule" type="button" onclick="window.location.href='capsule/'">
+            <button id="btn-capsule" class="draw-choice capsule" type="button" onclick="openCapsule()">
                 <i class="fas fa-shuttle-space" aria-hidden="true"></i><strong>우주 캡슐</strong><small>두근두근 캡슐 열기</small>
             </button>
         </div>
     </div>
+
+    <dialog id="capsule-overlay" aria-label="우주 캡슐 뽑기">
+        <div class="capsule-overlay-bar">
+            <strong>우주 캡슐 뽑기</strong>
+            <button id="capsule-close" type="button" onclick="closeCapsule()" autofocus>닫기 <span aria-hidden="true">×</span></button>
+        </div>
+        <p id="capsule-loading" role="status">우주 캡슐을 여는 중…</p>
+        <iframe id="capsule-frame" title="우주 캡슐 뽑기 화면"></iframe>
+    </dialog>
 
     <!-- Dock Toggle Button -->
     <button id="dock-toggle" class="dock-toggle-btn" onclick="toggleDock()" title="도구 모음 숨기기/보이기"><i class="fas fa-chevron-down"></i></button>
@@ -896,6 +931,40 @@
             else { document.querySelectorAll('.widget').forEach(w => w.style.zIndex = 10); widget.style.zIndex = 100; }
             requestAnimationFrame(() => document.getElementById('roulette-spinBtn').focus());
         }
+        function openCapsule() {
+            closeDrawChooser();
+            const overlay = document.getElementById('capsule-overlay');
+            if (overlay.open) return;
+            document.getElementById('capsule-loading').hidden = false;
+            overlay.showModal();
+            document.getElementById('capsule-frame').src = 'capsule/?classroom=1';
+        }
+        function closeCapsule() {
+            const overlay = document.getElementById('capsule-overlay');
+            if (overlay.open) overlay.close();
+        }
+        document.getElementById('capsule-overlay').addEventListener('close', () => {
+            // Unload the frame so sounds and animations also stop when closed.
+            document.getElementById('capsule-frame').removeAttribute('src');
+            const presetSelect = document.getElementById('roulette-presetSelect');
+            const selectedPreset = presetSelect.value;
+            RouletteApp.refreshPresets();
+            presetSelect.value = selectedPreset;
+            document.getElementById('btn-roulette').focus();
+        });
+        document.getElementById('capsule-frame').addEventListener('load', event => {
+            if (!document.getElementById('capsule-overlay').open || !event.target.hasAttribute('src')) return;
+            document.getElementById('capsule-loading').hidden = true;
+            const capsuleDocument = event.target.contentDocument;
+            const backLink = capsuleDocument.querySelector('.back-link');
+            if (backLink) backLink.addEventListener('click', event => { event.preventDefault(); closeCapsule(); });
+            capsuleDocument.addEventListener('keydown', event => {
+                // A winner dialog handles its own Escape key before returning to the classroom.
+                if (event.key === 'Escape' && !capsuleDocument.querySelector('dialog[open]')) {
+                    event.preventDefault(); closeCapsule();
+                }
+            });
+        });
         function dismissDrawChooserOutside(event) {
             const chooser = document.getElementById('draw-chooser');
             if (!chooser.hidden && !chooser.contains(event.target) && !document.getElementById('btn-roulette').contains(event.target)) closeDrawChooser();
