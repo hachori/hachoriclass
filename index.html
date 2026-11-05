@@ -413,6 +413,32 @@
         .ebook-grade-btn i { font-size: 2rem; margin-bottom: 8px; }
         .ebook-grade-btn span { font-size: 0.9rem; font-weight: 700; }
 
+        /* --- Draw Method Chooser --- */
+        .draw-chooser {
+            position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%);
+            width: min(380px, calc(100vw - 24px)); padding: 18px; border-radius: 20px;
+            background: rgba(255,255,255,0.98); box-shadow: 0 12px 40px rgba(15,23,42,0.25);
+            z-index: 1002; font-family: 'A2Z', sans-serif; animation: popupFadeIn 0.2s ease;
+        }
+        .draw-chooser[hidden] { display: none; }
+        .draw-chooser-title { margin: 0 0 12px; color: #334155; font-size: 17px; font-weight: 900; text-align: center; }
+        .draw-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .draw-choice {
+            display: flex; flex-direction: column; align-items: center; gap: 9px; padding: 18px 8px;
+            border: 2px solid #e0e7ff; border-radius: 15px; background: #f5f7ff; color: #4338ca;
+            font: inherit; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .draw-choice i { font-size: 32px; }
+        .draw-choice strong { font-size: 18px; font-weight: 900; }
+        .draw-choice small { font-size: 12px; color: #64748b; }
+        .draw-choice.capsule { background: #effcf9; border-color: #b6ece1; color: #087f76; }
+        .draw-choice:hover { transform: translateY(-3px); box-shadow: 0 6px 15px rgba(67,56,202,0.12); }
+        .draw-choice:focus-visible { outline: 3px solid #6366f1; outline-offset: 3px; }
+        @media (prefers-reduced-motion: reduce) {
+            .draw-chooser { animation: none; }
+            .draw-choice { transition: none; }
+        }
+
         /* --- Bottom Toolbar --- */
         .toolbar-container { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 1000; }
         .toolbar-group { background-color: rgba(255, 255, 255, 0.95); padding: 10px; border-radius: 1rem; box-shadow: 0 5px 20px rgba(0,0,0,0.15); display: flex; gap: 10px; }
@@ -670,6 +696,18 @@
         </div>
     </div>
 
+    <div id="draw-chooser" class="draw-chooser" role="group" aria-labelledby="draw-chooser-title" hidden>
+        <h2 id="draw-chooser-title" class="draw-chooser-title">어떤 방법으로 뽑을까요?</h2>
+        <div class="draw-choices">
+            <button id="btn-classic-roulette" class="draw-choice" type="button" onclick="openClassicRoulette()">
+                <i class="fas fa-dharmachakra" aria-hidden="true"></i><strong>일반 룰렛</strong><small>빙글빙글 돌려 뽑기</small>
+            </button>
+            <button id="btn-capsule" class="draw-choice capsule" type="button" onclick="window.location.href='capsule/'">
+                <i class="fas fa-shuttle-space" aria-hidden="true"></i><strong>우주 캡슐</strong><small>두근두근 캡슐 열기</small>
+            </button>
+        </div>
+    </div>
+
     <!-- Dock Toggle Button -->
     <button id="dock-toggle" class="dock-toggle-btn" onclick="toggleDock()" title="도구 모음 숨기기/보이기"><i class="fas fa-chevron-down"></i></button>
 
@@ -679,8 +717,7 @@
             <button id="btn-clock" class="tool-btn" onclick="toggleWidget('widget-clock', 'btn-clock')"><i class="far fa-clock"></i><span>시계</span></button>
             <button id="btn-timer" class="tool-btn" onclick="toggleWidget('widget-timer', 'btn-timer')"><i class="fas fa-hourglass-half"></i><span>타이머</span></button>
             <button id="btn-note" class="tool-btn" onclick="toggleWidget('widget-note', 'btn-note')"><i class="fas fa-book-open"></i><span>영어노트</span></button>
-            <button id="btn-roulette" class="tool-btn" onclick="toggleWidget('widget-roulette', 'btn-roulette')"><i class="fas fa-dharmachakra"></i><span>룰렛</span></button>
-            <button id="btn-capsule" class="tool-btn" onclick="window.location.href='capsule/'"><i class="fas fa-shuttle-space"></i><span>우주 캡슐</span></button>
+            <button id="btn-roulette" class="tool-btn" type="button" onclick="toggleDrawChooser()" aria-controls="draw-chooser" aria-expanded="false"><i class="fas fa-dharmachakra" aria-hidden="true"></i><span>룰렛</span></button>
             <button id="btn-ebook" class="tool-btn" onclick="toggleEbookPopup()"><i class="fas fa-tablet-alt"></i><span>E-book</span></button>
             <button id="btn-seat" class="tool-btn" onclick="window.open('https://hachori.github.io/seat/v2', '_blank')"><i class="fas fa-chair"></i><span>자리배치</span></button>
         </div>
@@ -835,11 +872,46 @@
         function clearNote() { document.getElementById('english-note-input').innerHTML = ''; document.getElementById('english-note-input').focus(); }
 
         const ebookUrls = { 3: 'https://cdata2.tsherpa.co.kr/ebook/tsherpa/22/22ebook_E/TB2022TC1EE_30H/viewer/ebook/index.html?contentInformationURL=../../resource/ebook/&page=21', 4: 'https://cdata2.tsherpa.co.kr/ebook/tsherpa/22/22ebook_E/TB2022TC1EE_40H/viewer/ebook/index.html?contentInformationURL=..%2F..%2Fresource%2Febook%2F&page=14' };
-        function toggleEbookPopup() { document.getElementById('ebook-popup').classList.toggle('show'); document.getElementById('btn-ebook').classList.toggle('active'); }
+        function closeDrawChooser(returnFocus = false) {
+            document.getElementById('draw-chooser').hidden = true;
+            const button = document.getElementById('btn-roulette');
+            button.setAttribute('aria-expanded', 'false');
+            button.classList.toggle('active', document.getElementById('widget-roulette').style.display === 'flex');
+            if (returnFocus) button.focus();
+        }
+        function toggleDrawChooser() {
+            const chooser = document.getElementById('draw-chooser');
+            if (!chooser.hidden) { closeDrawChooser(true); return; }
+            document.getElementById('ebook-popup').classList.remove('show');
+            document.getElementById('btn-ebook').classList.remove('active');
+            chooser.hidden = false;
+            document.getElementById('btn-roulette').setAttribute('aria-expanded', 'true');
+            document.getElementById('btn-roulette').classList.add('active');
+            document.getElementById('btn-classic-roulette').focus();
+        }
+        function openClassicRoulette() {
+            closeDrawChooser();
+            const widget = document.getElementById('widget-roulette');
+            if (widget.style.display !== 'flex') toggleWidget('widget-roulette', 'btn-roulette');
+            else { document.querySelectorAll('.widget').forEach(w => w.style.zIndex = 10); widget.style.zIndex = 100; }
+            requestAnimationFrame(() => document.getElementById('roulette-spinBtn').focus());
+        }
+        function dismissDrawChooserOutside(event) {
+            const chooser = document.getElementById('draw-chooser');
+            if (!chooser.hidden && !chooser.contains(event.target) && !document.getElementById('btn-roulette').contains(event.target)) closeDrawChooser();
+        }
+        document.addEventListener('pointerdown', dismissDrawChooserOutside);
+        document.addEventListener('focusin', dismissDrawChooserOutside);
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && !document.getElementById('draw-chooser').hidden) {
+                event.preventDefault(); closeDrawChooser(true);
+            }
+        });
+        function toggleEbookPopup() { closeDrawChooser(); document.getElementById('ebook-popup').classList.toggle('show'); document.getElementById('btn-ebook').classList.toggle('active'); }
         function openEbook(grade) { window.open(ebookUrls[grade], 'ebook_' + grade, 'width=1200,height=800'); document.getElementById('ebook-popup').classList.remove('show'); document.getElementById('btn-ebook').classList.remove('active'); }
         
         let isDockVisible = true;
-        function toggleDock() { isDockVisible = !isDockVisible; const toolbar = document.getElementById('toolbar-container'), icon = document.querySelector('#dock-toggle i'); if (isDockVisible) { toolbar.classList.remove('hidden'); icon.className = 'fas fa-chevron-down'; } else { toolbar.classList.add('hidden'); icon.className = 'fas fa-chevron-up'; } }
+        function toggleDock() { closeDrawChooser(); isDockVisible = !isDockVisible; const toolbar = document.getElementById('toolbar-container'), icon = document.querySelector('#dock-toggle i'); if (isDockVisible) { toolbar.classList.remove('hidden'); icon.className = 'fas fa-chevron-down'; } else { toolbar.classList.add('hidden'); icon.className = 'fas fa-chevron-up'; } }
 
         // ==========================================
         // 4. Roulette (인형뽑기/스캐닝 긴장감 기능 추가)
