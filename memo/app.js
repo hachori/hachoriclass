@@ -44,7 +44,8 @@ function mergeStates(local, remote) {
 const fingerprint = state => JSON.stringify(state);
 
 class MemoBoard {
-  constructor() {
+  constructor({user,token}) {
+    this.user = user; this.token = token; this.events = new AbortController(); this.requests = new Set();
     this.state = {version:1,items:[]}; this.dirty = false; this.syncing = false;
     this.visible = window.parent === window || !!window.frameElement?.closest('dialog')?.open;
     this.cloudStamp = null; this.localFailed = false; this.ready = this.init();
@@ -52,67 +53,47 @@ class MemoBoard {
   async init() {
     try {
       if (!crypto.subtle) throw new Error('최신 브라우저의 HTTPS 주소에서 열어 주세요.');
-      const hash = location.hash.slice(1);
-      let savedToken;
-      try { savedToken = localStorage.getItem(ACTIVE_KEY); } catch { this.localFailed = true; }
-      if (hash && !/^v1\.[A-Za-z0-9_-]{43}$/.test(hash)) throw new Error('메모 링크가 올바르지 않아요. 사용하던 링크 전체를 확인해 주세요.');
-      this.token = hash ? hash.slice(3) : validToken(savedToken) ? savedToken : tokenFor(crypto.getRandomValues(new Uint8Array(32)));
-      this.createdHere = !hash && !validToken(savedToken);
+      if (!this.user || !validToken(this.token)) throw new Error('다시 로그인해 주세요.');
       const raw = tokenBytes(this.token);
       this.key = await crypto.subtle.importKey('raw',raw,'AES-GCM',false,['encrypt','decrypt']);
-      const digest = await crypto.subtle.digest('SHA-256',raw);
-      this.id = 'memo_v1_' + Array.from(new Uint8Array(digest),n => n.toString(16).padStart(2,'0')).join('');
-      this.url = CLOUD + this.id + '?key=' + API_KEY;
-      this.shareURL = new URL('./',location.href).href + '#v1.' + this.token;
-      history.replaceState(null,'',location.pathname + location.search + '#v1.' + this.token);
+      if (this.stopped) { this.key = null; return; }
+      this.id = 'account_' + this.user.uid;
+      this.cacheKey = CACHE_PREFIX + this.id;
+      this.url = CLOUD.replace('/classes/','/teacherMemos/') + encodeURIComponent(this.user.uid) + '?key=' + API_KEY;
       try {
-        localStorage.setItem(ACTIVE_KEY,this.token);
-        const cache = JSON.parse(localStorage.getItem(CACHE_PREFIX + this.id) || 'null');
-        if (cache) { this.state = cleanState(cache.state); this.dirty = !!cache.dirty; this.hasCache = true; }
+        const draft = JSON.parse(sessionStorage.getItem(this.cacheKey + '_draft') || 'null');
+        const cache = JSON.parse(localStorage.getItem(this.cacheKey) || 'null');
+        if (draft) { this.state = cleanState(draft.state); this.dirty = !!draft.dirty; this.hasCache = true; }
+        else if (cache?.encrypted) { this.state = await this.decrypted(cache.encrypted); this.dirty = !!cache.dirty; this.hasCache = true; }
       } catch { this.localFailed = true; }
+      if (this.stopped) return;
       this.bind(); this.render();
-      $('share-link').disabled = false; $('sync-now').disabled = false;
-      $('memo-share-url').value = this.shareURL;
+      $('sync-now').disabled = false;
       this.poll = setInterval(() => { if (this.visible && !document.hidden) this.sync(); },30000);
       await this.sync();
-      $('workspace').inert = !(this.loaded || this.hasCache || this.createdHere);
+      if (!this.stopped) $('workspace').inert = !(this.loaded || this.hasCache);
     } catch (error) { this.status('error',error.message || '메모를 열지 못했어요. 다시 열어 주세요.'); }
   }
   bind() {
-    $('todo-form').addEventListener('submit',event => {
+    const on = (target,event,handler) => target.addEventListener(event,handler,{signal:this.events.signal});
+    on($('todo-form'),'submit',event => {
       event.preventDefault(); const title = $('todo-input').value.trim(); if (!title) return;
       this.change(crypto.randomUUID(),{type:'todo',title}); $('todo-input').value = ''; $('todo-input').focus();
     });
-    $('todo-filter').addEventListener('change',() => this.render());
-    $('memo-text').addEventListener('input',() => this.change('note-main',{type:'note',body:$('memo-text').value}));
-    $('memo-text').addEventListener('blur',() => this.render());
-    $('link-form').addEventListener('submit',event => {
+    on($('todo-filter'),'change',() => this.render());
+    on($('memo-text'),'input',() => this.change('note-main',{type:'note',body:$('memo-text').value}));
+    on($('memo-text'),'blur',() => this.render());
+    on($('link-form'),'submit',event => {
       event.preventDefault(); const url = safeURL($('link-url').value);
       $('link-error').hidden = !!url;
       if (!url) { $('link-error').textContent = 'http:// 또는 https:// 주소를 입력해 주세요.'; return; }
       this.change(crypto.randomUUID(),{type:'link',title:$('link-title').value.trim() || new URL(url).hostname,url});
       $('link-form').reset(); $('link-title').focus();
     });
-    $('link-url').addEventListener('input',() => { $('link-error').hidden = true; });
-    $('share-link').addEventListener('click',() => { $('copy-link').textContent = '복사'; $('share-dialog').showModal(); $('memo-share-url').select(); });
-    $('memo-share-url').addEventListener('click',() => $('memo-share-url').select());
-    $('copy-link').addEventListener('click',async () => {
-      try { await navigator.clipboard.writeText(this.shareURL); $('copy-link').textContent = '복사 완료'; }
-      catch { $('memo-share-url').select(); $('copy-link').textContent = '주소를 선택했어요'; }
-    });
-    $('open-board-form').addEventListener('submit',async event => {
-      event.preventDefault(); let token;
-      try {
-        const url = new URL($('other-memo-url').value.trim());
-        if (url.origin !== location.origin || url.pathname.replace(/\/$/,'') !== new URL('./',location.href).pathname.replace(/\/$/,'') || !/^#v1\.[A-Za-z0-9_-]{43}$/.test(url.hash)) throw new Error();
-        token = url.hash.slice(4);
-      } catch { $('open-error').textContent = '‘내 메모 링크’에서 복사한 주소 전체를 붙여넣어 주세요.'; $('open-error').hidden = false; return; }
-      await this.sync();
-      location.hash = 'v1.' + token; location.reload();
-    });
-    $('sync-now').addEventListener('click',() => this.sync());
-    $('cancel-edit').addEventListener('click',() => $('edit-dialog').close());
-    $('edit-form').addEventListener('submit',event => {
+    on($('link-url'),'input',() => { $('link-error').hidden = true; });
+    on($('sync-now'),'click',() => this.sync());
+    on($('cancel-edit'),'click',() => $('edit-dialog').close());
+    on($('edit-form'),'submit',event => {
       event.preventDefault(); const item = this.state.items.find(item => item.id === this.editingId);
       if (!item) return;
       const title = $('edit-text').value.trim(); if (!title) return;
@@ -120,42 +101,34 @@ class MemoBoard {
       if (item.type === 'link' && !url) { $('edit-error').textContent = 'http:// 또는 https:// 주소를 입력해 주세요.'; $('edit-error').hidden = false; return; }
       this.change(item.id,{title,url,deleted:false}); $('edit-dialog').close();
     });
-    $('undo-delete').addEventListener('click',() => {
+    on($('undo-delete'),'click',() => {
       if (this.lastDeleted) this.change(this.lastDeleted.id,{...this.lastDeleted,deleted:false});
       this.lastDeleted = null; $('toast').hidden = true;
     });
-    document.querySelector('.back-link').addEventListener('click',event => {
-      if (window.parent !== window) { event.preventDefault(); window.parent.postMessage({type:'hachoriclass:memo-close'},location.origin); }
+    on(window,'online',() => this.sync());
+    on(window,'offline',() => this.status('local','이 기기에 저장됨 · 연결되면 동기화'));
+    on(window,'storage',async event => {
+      if (event.key !== this.cacheKey || !event.newValue) return;
+      try { const cache = JSON.parse(event.newValue); const state = await this.decrypted(cache.encrypted); if (this.stopped) return; this.state = mergeStates(this.state,state); this.dirty ||= !!cache.dirty; this.render(); this.schedule(); } catch { /* 다른 계정에는 영향이 없다. */ }
     });
-    document.addEventListener('keydown',event => {
-      if (event.key === 'Escape' && window.parent !== window && !document.querySelector('dialog[open]')) {
-        event.preventDefault(); window.parent.postMessage({type:'hachoriclass:memo-close'},location.origin);
-      }
-    });
-    window.addEventListener('message',event => {
-      if (event.origin !== location.origin || event.source !== window.parent || event.data?.type !== 'hachoriclass:memo-visible') return;
-      this.visible = !!event.data.visible; this.sync();
-    });
-    window.addEventListener('online',() => this.sync());
-    window.addEventListener('offline',() => this.status('local','이 기기에 저장됨 · 연결되면 동기화'));
-    window.addEventListener('storage',event => {
-      if (event.key !== CACHE_PREFIX + this.id || !event.newValue) return;
-      try { const cache = JSON.parse(event.newValue); this.state = mergeStates(this.state,cleanState(cache.state)); this.dirty ||= !!cache.dirty; this.render(); this.schedule(); } catch { /* 다른 메모장에는 영향이 없다. */ }
-    });
-    document.addEventListener('visibilitychange',() => {
+    on(document,'visibilitychange',() => {
       if (!document.hidden) this.sync(); else this.keepalive();
     });
-    window.addEventListener('pagehide',() => this.keepalive());
+    on(window,'pagehide',() => this.keepalive());
   }
   status(state,text) {
+    if (this.stopped) return;
     $('sync-status').dataset.state = state;
     if ($('sync-status').textContent !== text) $('sync-status').textContent = text;
   }
   cache() {
-    try { localStorage.setItem(CACHE_PREFIX + this.id,JSON.stringify({state:this.state,dirty:this.dirty})); }
+    if (this.stopped) return;
+    try { sessionStorage.setItem(this.cacheKey + '_draft',JSON.stringify({state:this.state,dirty:this.dirty})); }
     catch { this.localFailed = true; }
+    this.prepareKeepalive();
   }
   change(id,patch) {
+    if (this.stopped) return;
     const previous = this.state.items.find(item => item.id === id) || {id,type:'todo',title:'',body:'',url:'',done:false,deleted:false};
     const clock = Math.max(Date.now(),...this.state.items.map(item => item.updatedAt || 0)) + 1;
     const next = {...previous,...patch,id,updatedAt:clock,rev:crypto.randomUUID()};
@@ -185,6 +158,7 @@ class MemoBoard {
     button.className = className; button.setAttribute('aria-label',label); button.addEventListener('click',action); return button;
   }
   render() {
+    if (this.stopped) return;
     const focus = document.activeElement?.dataset.focusKey;
     const active = this.state.items.filter(item => !item.deleted);
     const todos = active.filter(item => item.type === 'todo').sort((a,b) => Number(a.done) - Number(b.done) || b.updatedAt - a.updatedAt);
@@ -225,24 +199,27 @@ class MemoBoard {
   }
   async decrypted(doc) {
     const fields = doc.fields;
-    if (fields?.kind?.stringValue !== KIND || fields.version?.integerValue !== '1') throw new Error('이 메모를 열 수 없어요. 메모 링크를 확인해 주세요.');
+    if (fields?.kind?.stringValue !== KIND || fields.version?.integerValue !== '1') throw new Error('계정의 메모 형식을 확인할 수 없어요. 다시 로그인해 주세요.');
     try {
       const plaintext = await crypto.subtle.decrypt({name:'AES-GCM',iv:fromBase64(fields.iv.stringValue),additionalData:bytes(this.id)},this.key,fromBase64(fields.cipher.stringValue));
       return cleanState(JSON.parse(new TextDecoder().decode(plaintext)));
-    } catch { throw new Error('메모를 열지 못했어요. 사용하던 링크를 다시 확인해 주세요.'); }
+    } catch { throw new Error('메모를 열지 못했어요. 계정 연결을 다시 확인해 주세요.'); }
   }
   async request(url,options = {}) {
     const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(),8000);
+    this.requests.add(ctrl);
     try {
-      const response = await fetch(url,{...options,signal:ctrl.signal});
+      this.bearer = await this.user.getIdToken();
+      if (this.stopped) throw new DOMException('Stopped','AbortError');
+      const response = await fetch(url,{...options,headers:{...options.headers,Authorization:'Bearer ' + this.bearer},signal:ctrl.signal});
       const data = await response.json(); return {response,data};
-    } finally { clearTimeout(timer); }
+    } finally { clearTimeout(timer); this.requests.delete(ctrl); }
   }
   async sync() {
-    if (!this.key) return;
+    if (!this.key || this.stopped) return;
     if (this.syncing) { this.syncAgain = true; return; }
     if (!navigator.onLine) {
-      if (!this.loaded && !this.hasCache && !this.createdHere) this.status('error','인터넷에 연결하면 이 메모를 불러올 수 있어요.');
+      if (!this.loaded && !this.hasCache) this.status('error','인터넷에 연결하면 이 메모를 불러올 수 있어요.');
       else this.status(this.localFailed ? 'error' : 'local',this.localFailed ? '저장할 수 없어요. 인터넷 연결을 확인해 주세요.' : '이 기기에 저장됨 · 연결되면 동기화');
       return;
     }
@@ -251,6 +228,7 @@ class MemoBoard {
     try {
       for (let attempt = 0; attempt < 4; attempt++) {
         const {response,data} = await this.request(this.url);
+        if (this.stopped) return;
         if (!response.ok && response.status !== 404) throw new Error('동기화하지 못했어요. 이 기기에 저장하고 다시 시도합니다.');
         const remote = response.status === 404 ? {version:1,items:[]} : await this.decrypted(data);
         this.cloudStamp = response.status === 404 ? null : data.updateTime;
@@ -268,14 +246,14 @@ class MemoBoard {
         } else this.dirty = false;
         this.cache(); this.prepared = null; success = true; this.loaded = true; $('workspace').inert = false;
         if (this.dirty) { this.status('pending','이 기기에 저장됨 · 동기화 중…'); this.prepareKeepalive(); }
-        else this.status('saved',this.localFailed ? '클라우드에 저장됨 · 내 메모 링크를 보관해 주세요' : this.state.items.length ? '클라우드에 저장됨' : '준비됐어요 · 입력하면 자동 저장');
+        else this.status('saved',this.state.items.length ? '내 계정에 저장됨' : '준비됐어요 · 입력하면 자동 저장');
         break;
       }
       if (!success) throw new Error('다른 기기의 수정 사항을 확인 중이에요. 잠시 뒤 다시 시도합니다.');
     } catch (error) {
       this.cache(); this.status('error',error.name === 'AbortError' ? '연결이 느려요. 이 기기에 저장하고 다시 시도합니다.' : error instanceof TypeError ? '인터넷 연결을 확인해 주세요. 이 기기의 메모는 유지됩니다.' : error.message || '연결을 확인해 주세요. 이 기기의 메모는 유지됩니다.');
       if (this.localFailed) this.status('error','아직 저장하지 못했어요. 인터넷 연결을 확인해 주세요.');
-      else if (!this.loaded && !this.hasCache && !this.createdHere) this.status('error','이 컴퓨터에 메모 사본이 없어요. 인터넷 연결 후 다시 동기화해 주세요.');
+      else if (!this.loaded && !this.hasCache) this.status('error','이 컴퓨터에 메모 사본이 없어요. 인터넷 연결 후 다시 동기화해 주세요.');
     } finally {
       this.syncing = false;
       if (success && (this.dirty || this.syncAgain)) this.schedule();
@@ -284,14 +262,29 @@ class MemoBoard {
   async prepareKeepalive() {
     try {
       const sig = fingerprint(this.state), body = JSON.stringify(await this.encrypted(this.state));
-      if (sig === fingerprint(this.state)) this.prepared = {sig,body,stamp:this.cloudStamp};
+      if (!this.stopped && sig === fingerprint(this.state)) {
+        this.prepared = {sig,body,stamp:this.cloudStamp};
+        localStorage.setItem(this.cacheKey,JSON.stringify({encrypted:JSON.parse(body),dirty:this.dirty}));
+      }
     } catch { /* 일반 동기화에서 저장 상태를 표시한다. */ }
   }
   keepalive() {
-    if (!this.dirty || !this.prepared || this.prepared.sig !== fingerprint(this.state) || bytes(this.prepared.body).length > 60000) return;
+    if (this.stopped || !this.bearer || !this.dirty || !this.prepared || this.prepared.sig !== fingerprint(this.state) || bytes(this.prepared.body).length > 60000) return;
     const condition = this.prepared.stamp ? '&currentDocument.updateTime=' + encodeURIComponent(this.prepared.stamp) : '&currentDocument.exists=false';
-    fetch(this.url + condition,{method:'PATCH',headers:{'Content-Type':'application/json'},body:this.prepared.body,keepalive:true}).catch(() => {});
+    fetch(this.url + condition,{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer ' + this.bearer},body:this.prepared.body,keepalive:true}).catch(() => {});
+  }
+  async flush() {
+    clearTimeout(this.saveTimer);
+    while (this.syncing && !this.stopped) await new Promise(resolve => setTimeout(resolve,25));
+    if (this.dirty && !this.stopped) await this.sync();
+    await this.prepareKeepalive();
+  }
+  dispose() {
+    this.stopped = true; clearTimeout(this.saveTimer); clearTimeout(this.toastTimer); clearInterval(this.poll);
+    this.events.abort(); for (const request of this.requests) request.abort();
+    try { sessionStorage.removeItem(this.cacheKey + '_draft'); } catch { /* 암호화한 초안은 유지한다. */ }
+    this.key = null; this.bearer = null; this.token = null; this.state = {version:1,items:[]};
   }
 }
 
-window.addEventListener('DOMContentLoaded',() => { window.MemoApp = new MemoBoard(); });
+export {MemoBoard,cleanState,mergeStates,fingerprint,validToken,tokenFor,tokenBytes,bytes,fromBase64,ACTIVE_KEY,CACHE_PREFIX,CLOUD,API_KEY};

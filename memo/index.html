@@ -8,22 +8,28 @@
   <meta name="theme-color" content="#f5f5ef">
   <title>나의 교실 메모 · Hachori Class</title>
   <link rel="canonical" href="https://hachori.github.io/hachoriclass/memo/">
-  <link rel="stylesheet" href="style.css?v=1">
-  <script src="app.js?v=1" defer></script>
+  <link rel="stylesheet" href="style.css?v=2">
+  <script src="auth.js?v=2" type="module"></script>
 </head>
 <body>
   <header class="topbar">
     <a class="back-link" href="../">← 교실 화면</a>
     <span class="brand">HACHORI CLASS <b>MY DESK</b></span>
-    <button id="share-link" class="primary" type="button" disabled>내 메모 링크 ↗</button>
+    <div class="account-controls"><span id="account-name" hidden></span><button id="logout" class="secondary" type="button" hidden>로그아웃</button></div>
   </header>
   <main>
     <section class="intro">
       <div><p class="eyebrow">언제 어디서나, 나의 작은 책상</p><h1>나의 교실 메모<span>.</span></h1><p class="subtitle">교실이 바뀌어도, 하던 일을 이어서.</p></div>
-      <div class="save-box"><div id="sync-status" class="sync-status" role="status" aria-live="polite" data-state="loading">메모를 불러오는 중…</div><button id="sync-now" class="text-button" type="button" disabled>지금 동기화</button></div>
+      <div class="save-box"><div id="sync-status" class="sync-status" role="status" aria-live="polite" data-state="loading">로그인을 확인하는 중…</div><button id="sync-now" class="text-button" type="button" hidden disabled>지금 동기화</button></div>
     </section>
-    <aside class="link-tip"><span aria-hidden="true">↗</span><p><strong>다른 교실에서도 같은 메모를 열려면</strong> ‘내 메모 링크’를 복사해 즐겨찾기에 저장하세요.</p></aside>
-    <div id="workspace" class="workspace" inert>
+    <section id="auth-gate" class="auth-gate" aria-labelledby="login-title">
+      <span class="login-symbol" aria-hidden="true">✓</span><h2 id="login-title">어느 교실에서나, 같은 메모</h2><p>Google 계정으로 로그인하면<br>할 일·메모·링크를 자동으로 불러옵니다.</p>
+      <button id="login" class="google-login" type="button" disabled><span aria-hidden="true">G</span> Google 계정으로 로그인</button>
+      <p id="auth-error" class="field-error" role="alert" hidden></p><button id="retry-account" class="secondary" type="button" hidden>다시 불러오기</button>
+    </section>
+    <aside id="account-tip" class="link-tip" hidden><span aria-hidden="true">✓</span><p><strong>같은 Google 계정으로 로그인하면 자동으로 이어집니다.</strong> 교실을 옮길 때 메모 링크를 따로 복사할 필요가 없어요.</p><button id="show-import" class="text-button" type="button">기존 메모 가져오기</button></aside>
+    <aside id="legacy-banner" class="legacy-banner" hidden><p>이 기기에 이전 방식으로 저장한 메모가 있어요.</p><button id="import-local" class="secondary" type="button">내 계정에 가져오기</button></aside>
+    <div id="workspace" class="workspace" hidden inert>
       <section class="panel todo-panel" aria-labelledby="todo-title">
         <div class="panel-heading"><div><span class="section-number">01 / CHECK LIST</span><h2 id="todo-title">오늘의 할 일 <span id="todo-count" class="count">0</span></h2></div><span class="panel-icon" aria-hidden="true">✓</span></div>
         <form id="todo-form" class="quick-add"><label class="sr-only" for="todo-input">새 할 일</label><input id="todo-input" maxlength="240" placeholder="할 일을 적고 Enter" autocomplete="off" required><button type="submit" aria-label="할 일 추가">＋</button></form>
@@ -44,7 +50,7 @@
     </div>
     <footer>HACHORI CLASS · 나의 수업을 잇는 메모</footer>
   </main>
-  <dialog id="share-dialog" aria-labelledby="share-title"><form method="dialog" class="dialog-top"><h2 id="share-title">어느 교실에서나, 같은 메모</h2><button class="icon-button" aria-label="링크 창 닫기">×</button></form><p>아래 링크를 다른 컴퓨터에서 열면 이 메모를 그대로 이어 쓸 수 있어요.</p><label for="memo-share-url">내 메모 링크</label><div class="copy-row"><input id="memo-share-url" readonly spellcheck="false"><button id="copy-link" class="primary" type="button">복사</button></div><p class="share-hint">이 링크를 가진 사람은 메모를 읽고 수정할 수 있어요. 나만 사용하는 곳에 보관해 주세요.</p><hr><h3>이미 사용하던 메모가 있나요?</h3><form id="open-board-form"><label class="sr-only" for="other-memo-url">사용하던 메모 링크</label><input id="other-memo-url" placeholder="사용하던 메모 링크를 붙여넣으세요" required><button class="secondary" type="submit">이 링크의 메모 열기</button><p id="open-error" class="field-error" role="alert" hidden></p></form></dialog>
+  <dialog id="import-dialog" aria-labelledby="import-title"><form method="dialog" class="dialog-top"><h2 id="import-title">기존 메모를 내 계정으로</h2><button class="icon-button" aria-label="가져오기 창 닫기">×</button></form><p>이 기기에 저장된 이전 메모를 가져옵니다. 다른 기기의 이전 메모는 사용하던 메모 링크를 붙여넣어 주세요.</p><p>현재 계정의 할 일과 링크는 유지하고, 자유 메모는 기존 내용 뒤에 붙입니다.</p><form id="import-form"><label for="legacy-url">이전 메모 링크 <small>(선택)</small></label><input id="legacy-url" placeholder="이 기기의 메모를 가져오려면 비워두세요" autocomplete="off"><button id="import-submit" class="primary" type="submit">내 계정으로 가져오기</button><p id="import-status" class="field-error" role="status" hidden></p></form></dialog>
   <dialog id="edit-dialog" aria-labelledby="edit-title"><form id="edit-form"><div class="dialog-top"><h2 id="edit-title">할 일 수정</h2><button id="cancel-edit" class="icon-button" type="button" aria-label="수정 취소">×</button></div><label for="edit-text">이름</label><input id="edit-text" maxlength="240" required><div id="edit-url-row" hidden><label for="edit-url">주소</label><input id="edit-url" maxlength="2048"></div><p id="edit-error" class="field-error" role="alert" hidden></p><button class="primary" type="submit">수정 완료</button></form></dialog>
   <div id="toast" class="toast" role="status" hidden><span id="toast-text"></span><button id="undo-delete" type="button" hidden>되돌리기</button></div>
 </body>

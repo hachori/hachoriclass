@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Existing classroom roster, seating plan, and legacy encrypted memo access.
+    match /classes/{classId} {
+      allow read, write: if true;
+    }
+
+    function owns(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // Encryption keys are private and immutable after the first successful create.
+    match /memoAccounts/{uid} {
+      allow get: if owns(uid);
+      allow create: if owns(uid)
+        && request.resource.data.keys().hasOnly(['version', 'key'])
+        && request.resource.data.version == 1
+        && request.resource.data.key is string
+        && request.resource.data.key.matches('^[A-Za-z0-9_-]{43}$');
+    }
+
+    match /teacherMemos/{uid} {
+      allow get: if owns(uid);
+      allow create, update: if owns(uid)
+        && request.resource.data.keys().hasOnly(['kind', 'version', 'iv', 'cipher'])
+        && request.resource.data.kind == 'hachoriclass-memo-v1'
+        && request.resource.data.version == 1
+        && request.resource.data.iv is string
+        && request.resource.data.iv.size() == 16
+        && request.resource.data.cipher is string
+        && request.resource.data.cipher.size() <= 650000;
+    }
+  }
+}
