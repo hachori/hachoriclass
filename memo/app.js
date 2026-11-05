@@ -7,6 +7,8 @@ const CACHE_PREFIX = 'hachoriclass_memo_cache_v1_';
 const CLOUD = 'https://firestore.googleapis.com/v1/projects/classroom-seats-8dfbf/databases/(default)/documents/classes/';
 const API_KEY = 'AIzaSyCkWzg1dDmjtos3gTKqmiOLOrx0-F6seFI';
 const KIND = 'hachoriclass-memo-v1';
+const SHARED_ID = 'hachoriclass_memo_main_v3';
+const SHARED_KIND = 'hachoriclass-shared-memo-v1';
 const bytes = value => new TextEncoder().encode(value);
 const asBase64 = value => {
   const data = new Uint8Array(value); let binary = '';
@@ -44,26 +46,31 @@ function mergeStates(local, remote) {
 const fingerprint = state => JSON.stringify(state);
 
 class MemoBoard {
-  constructor({user,token}) {
+  constructor({user=null,token=null,shared=false,documentId=SHARED_ID} = {}) {
+    this.shared = shared; this.documentId = documentId;
     this.user = user; this.token = token; this.events = new AbortController(); this.requests = new Set();
     this.state = {version:1,items:[]}; this.dirty = false; this.syncing = false;
-    this.visible = window.parent === window || !!window.frameElement?.closest('dialog')?.open;
+    this.visible = window.parent === window || !!window.frameElement?.getClientRects().length;
     this.cloudStamp = null; this.localFailed = false; this.ready = this.init();
   }
   async init() {
     try {
       if (!crypto.subtle) throw new Error('최신 브라우저의 HTTPS 주소에서 열어 주세요.');
-      if (!this.user || !validToken(this.token)) throw new Error('다시 로그인해 주세요.');
-      const raw = tokenBytes(this.token);
-      this.key = await crypto.subtle.importKey('raw',raw,'AES-GCM',false,['encrypt','decrypt']);
-      if (this.stopped) { this.key = null; return; }
-      this.id = 'account_' + this.user.uid;
+      if (this.shared) this.id = this.documentId;
+      else {
+        if (!this.user || !validToken(this.token)) throw new Error('다시 로그인해 주세요.');
+        const raw = tokenBytes(this.token);
+        this.key = await crypto.subtle.importKey('raw',raw,'AES-GCM',false,['encrypt','decrypt']);
+        if (this.stopped) { this.key = null; return; }
+        this.id = 'account_' + this.user.uid;
+      }
       this.cacheKey = CACHE_PREFIX + this.id;
-      this.url = CLOUD.replace('/classes/','/teacherMemos/') + encodeURIComponent(this.user.uid) + '?key=' + API_KEY;
+      this.url = (this.shared ? CLOUD + encodeURIComponent(this.id) : CLOUD.replace('/classes/','/teacherMemos/') + encodeURIComponent(this.user.uid)) + '?key=' + API_KEY;
       try {
         const draft = JSON.parse(sessionStorage.getItem(this.cacheKey + '_draft') || 'null');
         const cache = JSON.parse(localStorage.getItem(this.cacheKey) || 'null');
-        if (draft) { this.state = cleanState(draft.state); this.dirty = !!draft.dirty; this.hasCache = true; }
+        if (this.shared && cache?.state) { this.state = cleanState(cache.state); this.dirty = !!cache.dirty; this.hasCache = true; }
+        else if (draft) { this.state = cleanState(draft.state); this.dirty = !!draft.dirty; this.hasCache = true; }
         else if (cache?.encrypted) { this.state = await this.decrypted(cache.encrypted); this.dirty = !!cache.dirty; this.hasCache = true; }
       } catch { this.localFailed = true; }
       if (this.stopped) return;
@@ -109,7 +116,7 @@ class MemoBoard {
     on(window,'offline',() => this.status('local','이 기기에 저장됨 · 연결되면 동기화'));
     on(window,'storage',async event => {
       if (event.key !== this.cacheKey || !event.newValue) return;
-      try { const cache = JSON.parse(event.newValue); const state = await this.decrypted(cache.encrypted); if (this.stopped) return; this.state = mergeStates(this.state,state); this.dirty ||= !!cache.dirty; this.render(); this.schedule(); } catch { /* 다른 계정에는 영향이 없다. */ }
+      try { const cache = JSON.parse(event.newValue); const state = this.shared ? cleanState(cache.state) : await this.decrypted(cache.encrypted); if (this.stopped) return; this.state = mergeStates(this.state,state); this.dirty ||= !!cache.dirty; this.render(); this.schedule(); } catch { /* 다른 메모에는 영향이 없다. */ }
     });
     on(document,'visibilitychange',() => {
       if (!document.hidden) this.sync(); else this.keepalive();
@@ -123,7 +130,7 @@ class MemoBoard {
   }
   cache() {
     if (this.stopped) return;
-    try { sessionStorage.setItem(this.cacheKey + '_draft',JSON.stringify({state:this.state,dirty:this.dirty})); }
+    try { (this.shared ? localStorage : sessionStorage).setItem(this.shared ? this.cacheKey : this.cacheKey + '_draft',JSON.stringify({state:this.state,dirty:this.dirty})); }
     catch { this.localFailed = true; }
     this.prepareKeepalive();
   }
@@ -193,12 +200,17 @@ class MemoBoard {
   async encrypted(state) {
     const plaintext = bytes(fingerprint(state));
     if (plaintext.length > 450000) throw new Error('메모의 양이 많아 동기화할 수 없어요. 오래된 항목을 정리해 주세요.');
+    if (this.shared) return {fields:{kind:{stringValue:SHARED_KIND},version:{integerValue:'1'},content:{stringValue:fingerprint(state)}}};
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const cipher = await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:bytes(this.id)},this.key,plaintext);
     return {fields:{kind:{stringValue:KIND},version:{integerValue:'1'},iv:{stringValue:asBase64(iv)},cipher:{stringValue:asBase64(cipher)}}};
   }
   async decrypted(doc) {
     const fields = doc.fields;
+    if (this.shared) {
+      if (fields?.kind?.stringValue !== SHARED_KIND || fields.version?.integerValue !== '1' || typeof fields.content?.stringValue !== 'string') throw new Error('저장된 메모 형식을 확인하지 못했어요.');
+      return cleanState(JSON.parse(fields.content.stringValue));
+    }
     if (fields?.kind?.stringValue !== KIND || fields.version?.integerValue !== '1') throw new Error('계정의 메모 형식을 확인할 수 없어요. 다시 로그인해 주세요.');
     try {
       const plaintext = await crypto.subtle.decrypt({name:'AES-GCM',iv:fromBase64(fields.iv.stringValue),additionalData:bytes(this.id)},this.key,fromBase64(fields.cipher.stringValue));
@@ -209,14 +221,14 @@ class MemoBoard {
     const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(),8000);
     this.requests.add(ctrl);
     try {
-      this.bearer = await this.user.getIdToken();
+      if (!this.shared) this.bearer = await this.user.getIdToken();
       if (this.stopped) throw new DOMException('Stopped','AbortError');
-      const response = await fetch(url,{...options,headers:{...options.headers,Authorization:'Bearer ' + this.bearer},signal:ctrl.signal});
+      const response = await fetch(url,{...options,headers:{...options.headers,...(this.bearer ? {Authorization:'Bearer ' + this.bearer} : {})},signal:ctrl.signal});
       const data = await response.json(); return {response,data};
     } finally { clearTimeout(timer); this.requests.delete(ctrl); }
   }
   async sync() {
-    if (!this.key || this.stopped) return;
+    if ((!this.shared && !this.key) || this.stopped) return;
     if (this.syncing) { this.syncAgain = true; return; }
     if (!navigator.onLine) {
       if (!this.loaded && !this.hasCache) this.status('error','인터넷에 연결하면 이 메모를 불러올 수 있어요.');
@@ -246,7 +258,7 @@ class MemoBoard {
         } else this.dirty = false;
         this.cache(); this.prepared = null; success = true; this.loaded = true; $('workspace').inert = false;
         if (this.dirty) { this.status('pending','이 기기에 저장됨 · 동기화 중…'); this.prepareKeepalive(); }
-        else this.status('saved',this.state.items.length ? '내 계정에 저장됨' : '준비됐어요 · 입력하면 자동 저장');
+        else this.status('saved',this.state.items.length ? this.shared ? '자동 저장됨' : '내 계정에 저장됨' : '준비됐어요 · 입력하면 자동 저장');
         break;
       }
       if (!success) throw new Error('다른 기기의 수정 사항을 확인 중이에요. 잠시 뒤 다시 시도합니다.');
@@ -264,14 +276,14 @@ class MemoBoard {
       const sig = fingerprint(this.state), body = JSON.stringify(await this.encrypted(this.state));
       if (!this.stopped && sig === fingerprint(this.state)) {
         this.prepared = {sig,body,stamp:this.cloudStamp};
-        localStorage.setItem(this.cacheKey,JSON.stringify({encrypted:JSON.parse(body),dirty:this.dirty}));
+        localStorage.setItem(this.cacheKey,JSON.stringify(this.shared ? {state:this.state,dirty:this.dirty} : {encrypted:JSON.parse(body),dirty:this.dirty}));
       }
     } catch { /* 일반 동기화에서 저장 상태를 표시한다. */ }
   }
   keepalive() {
-    if (this.stopped || !this.bearer || !this.dirty || !this.prepared || this.prepared.sig !== fingerprint(this.state) || bytes(this.prepared.body).length > 60000) return;
+    if (this.stopped || (!this.shared && !this.bearer) || !this.dirty || !this.prepared || this.prepared.sig !== fingerprint(this.state) || bytes(this.prepared.body).length > 60000) return;
     const condition = this.prepared.stamp ? '&currentDocument.updateTime=' + encodeURIComponent(this.prepared.stamp) : '&currentDocument.exists=false';
-    fetch(this.url + condition,{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer ' + this.bearer},body:this.prepared.body,keepalive:true}).catch(() => {});
+    fetch(this.url + condition,{method:'PATCH',headers:{'Content-Type':'application/json',...(this.bearer ? {Authorization:'Bearer ' + this.bearer} : {})},body:this.prepared.body,keepalive:true}).catch(() => {});
   }
   async flush() {
     clearTimeout(this.saveTimer);
@@ -287,4 +299,4 @@ class MemoBoard {
   }
 }
 
-export {MemoBoard,cleanState,mergeStates,fingerprint,validToken,tokenFor,tokenBytes,bytes,fromBase64,ACTIVE_KEY,CACHE_PREFIX,CLOUD,API_KEY};
+export {MemoBoard,cleanState,mergeStates,fingerprint,validToken,tokenFor,tokenBytes,bytes,fromBase64,ACTIVE_KEY,CACHE_PREFIX,CLOUD,API_KEY,SHARED_ID};

@@ -495,9 +495,13 @@
         .overlay-close:focus-visible { outline: 3px solid #9ce7d5; outline-offset: 2px; }
         .overlay-close span { font-size: 22px; line-height: 1; }
         .classroom-frame { display: block; flex: 1 1 0; width: 100%; min-height: 0; border: 0; background: #10152e; }
-        #memo-overlay, #memo-frame { background: #f5f5ef; color: #263f40; }
-        #memo-overlay .capsule-overlay-bar { border-color: #e3e7dc; }
-        #memo-close { border-color: #c9d4c2; background: #e9efdf; }
+        #widget-memo { box-sizing: border-box; width: 440px; height: 620px; min-width: 300px; min-height: 280px; max-width: calc(100vw - 24px); max-height: calc(100dvh - 130px); background: #f5f5ef; border: 1px solid #d6dfcd; box-shadow: 0 14px 45px #18352c25; padding-bottom: 9px; }
+        #widget-memo .widget-header { flex-shrink: 0; justify-content: space-between; padding: 8px 10px 8px 14px; background: #eaf0e1; color: #46624b; touch-action: none; font-family: 'A2Z', sans-serif; }
+        #widget-memo .widget-header strong { margin-left: 8px; font-size: 14px; }
+        #memo-close { border: 0; border-radius: 7px; background: transparent; color: #617558; font-size: 24px; line-height: 1; padding: 3px 8px; cursor: pointer; }
+        #memo-close:hover { background: #dbe5d1; }
+        #memo-frame { display: block; flex: 1 1 0; width: 100%; min-height: 0; border: 0; background: #f5f5ef; }
+        @media (max-width: 600px) { #widget-memo { width: calc(100vw - 24px); min-width: 0; resize: none; } }
         #capsule-loading { position: absolute; inset: 56px 0 0; display: grid; place-items: center; margin: 0; background: #10152e; pointer-events: none; }
         #capsule-loading[hidden] { display: none; }
 
@@ -798,13 +802,13 @@
         <iframe id="capsule-frame" class="classroom-frame" title="우주 캡슐 뽑기 화면"></iframe>
     </dialog>
 
-    <dialog id="memo-overlay" class="classroom-overlay" aria-label="메모">
-        <div class="capsule-overlay-bar">
-            <strong>나의 교실 메모</strong>
-            <button id="memo-close" class="overlay-close" type="button" onclick="closeMemo()" autofocus>닫기 <span aria-hidden="true">×</span></button>
+    <div id="widget-memo" class="widget" role="region" aria-label="메모" style="top: 80px; left: 880px; display: none;">
+        <div class="widget-header" aria-label="메모 창 이동">
+            <span><i class="fas fa-grip-lines" aria-hidden="true"></i><strong>메모</strong></span>
+            <button id="memo-close" type="button" onclick="closeMemo()" aria-label="메모 닫기">×</button>
         </div>
-        <iframe id="memo-frame" class="classroom-frame" title="할 일, 메모와 링크"></iframe>
-    </dialog>
+        <iframe id="memo-frame" title="할 일, 메모와 링크"></iframe>
+    </div>
 
     <!-- Dock Toggle Button -->
     <button id="dock-toggle" class="dock-toggle-btn" onclick="toggleDock()" title="도구 모음 숨기기/보이기"><i class="fas fa-chevron-down"></i></button>
@@ -815,7 +819,7 @@
             <button id="btn-clock" class="tool-btn" onclick="toggleWidget('widget-clock', 'btn-clock')"><i class="far fa-clock"></i><span>시계</span></button>
             <button id="btn-timer" class="tool-btn" onclick="toggleWidget('widget-timer', 'btn-timer')"><i class="fas fa-hourglass-half"></i><span>타이머</span></button>
             <button id="btn-note" class="tool-btn" onclick="toggleWidget('widget-note', 'btn-note')"><i class="fas fa-book-open"></i><span>영어노트</span></button>
-            <button id="btn-memo" class="tool-btn" type="button" onclick="openMemo()"><i class="fas fa-list-check" aria-hidden="true"></i><span>메모</span></button>
+            <button id="btn-memo" class="tool-btn" type="button" onclick="toggleMemo()"><i class="fas fa-list-check" aria-hidden="true"></i><span>메모</span></button>
             <button id="btn-roulette" class="tool-btn" type="button" onclick="toggleDrawChooser()" aria-controls="draw-chooser" aria-expanded="false"><i class="fas fa-dharmachakra" aria-hidden="true"></i><span>룰렛</span></button>
             <button id="btn-ebook" class="tool-btn" onclick="toggleEbookPopup()"><i class="fas fa-tablet-alt"></i><span>E-book</span></button>
             <button id="btn-seat" class="tool-btn" onclick="window.open('https://hachori.github.io/seat/v2', '_blank')"><i class="fas fa-chair"></i><span>자리배치</span></button>
@@ -856,6 +860,7 @@
         window.onclick = function(event) { if (!event.target.closest('.bg-selector-container')) { const menu = document.getElementById('bg-menu'); if (menu.classList.contains('show')) menu.classList.remove('show'); } }
 
         function makeDraggable(element) {
+            if (element.id === 'widget-memo') return;
             let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0; const header = element.querySelector('.widget-header');
             if (header) header.onmousedown = dragMouseDown;
             function dragMouseDown(e) { e.preventDefault(); pos3 = e.clientX; pos4 = e.clientY; document.onmouseup = closeDragElement; document.onmousemove = elementDrag; document.querySelectorAll('.widget').forEach(w => w.style.zIndex = 10); element.style.zIndex = 100; }
@@ -1033,24 +1038,67 @@
             closeDrawChooser();
             document.getElementById('ebook-popup').classList.remove('show');
             document.getElementById('btn-ebook').classList.remove('active');
-            const overlay = document.getElementById('memo-overlay'), frame = document.getElementById('memo-frame');
-            if (overlay.open) return;
-            overlay.showModal(); document.getElementById('btn-memo').classList.add('active');
-            if (!frame.hasAttribute('src')) frame.src = 'memo/?classroom=1';
+            const widget = document.getElementById('widget-memo'), frame = document.getElementById('memo-frame');
+            widget.style.display = 'flex'; bringMemoToFront();
+            document.getElementById('btn-memo').classList.add('active');
+            if (!frame.hasAttribute('src')) frame.src = 'memo/?widget=1&v=3';
             else frame.contentWindow.postMessage({type:'hachoriclass:memo-visible',visible:true},location.origin);
         }
-        function closeMemo() {
-            const overlay = document.getElementById('memo-overlay');
-            if (overlay.open) overlay.close();
+        function toggleMemo() { document.getElementById('widget-memo').style.display === 'flex' ? closeMemo() : openMemo(); }
+        function bringMemoToFront() {
+            document.querySelectorAll('.widget').forEach(widget => widget.style.zIndex = 10);
+            document.getElementById('widget-memo').style.zIndex = 100;
         }
-        document.getElementById('memo-overlay').addEventListener('close',() => {
-            // Keep the memo loaded until its queued cloud writes finish.
+        function closeMemo() {
+            document.getElementById('widget-memo').style.display = 'none';
+            // Keep queued writes running after hiding the floating memo.
             document.getElementById('memo-frame').contentWindow.postMessage({type:'hachoriclass:memo-visible',visible:false},location.origin);
             document.getElementById('btn-memo').classList.remove('active');
             document.getElementById('btn-memo').focus();
-        });
+        }
+        function setupMemoWidget() {
+            const widget = document.getElementById('widget-memo'), header = widget.querySelector('.widget-header');
+            const key = 'hachoriclass_memo_widget_layout_v1';
+            let layout;
+            try { layout = JSON.parse(localStorage.getItem(key) || 'null'); } catch {}
+            if (layout && Number.isFinite(layout.width) && Number.isFinite(layout.height)) {
+                widget.style.width = Math.max(300,layout.width) + 'px'; widget.style.height = Math.max(280,layout.height) + 'px';
+            }
+            widget.style.left = (layout && Number.isFinite(layout.left) ? layout.left : Math.max(12,innerWidth - 460)) + 'px';
+            widget.style.top = (layout && Number.isFinite(layout.top) ? layout.top : 80) + 'px';
+            const fit = () => {
+                if (widget.style.display !== 'flex') return;
+                const rect = widget.getBoundingClientRect();
+                widget.style.left = Math.max(0,Math.min(rect.left,innerWidth - rect.width)) + 'px';
+                widget.style.top = Math.max(0,Math.min(rect.top,innerHeight - rect.height - 85)) + 'px';
+            };
+            const save = () => {
+                if (widget.style.display !== 'flex') return;
+                const rect = widget.getBoundingClientRect();
+                try { localStorage.setItem(key,JSON.stringify({left:rect.left,top:rect.top,width:rect.width,height:rect.height})); } catch {}
+            };
+            let dragging;
+            header.addEventListener('pointerdown',event => {
+                if (event.button !== 0 || event.target.closest('button')) return;
+                event.preventDefault(); bringMemoToFront();
+                const rect = widget.getBoundingClientRect();
+                dragging = {x:event.clientX,y:event.clientY,left:rect.left,top:rect.top}; header.setPointerCapture(event.pointerId);
+            });
+            header.addEventListener('pointermove',event => {
+                if (!dragging) return;
+                widget.style.left = dragging.left + event.clientX - dragging.x + 'px';
+                widget.style.top = dragging.top + event.clientY - dragging.y + 'px'; fit();
+            });
+            const stop = () => { dragging = null; save(); };
+            header.addEventListener('pointerup',stop); header.addEventListener('pointercancel',stop); header.addEventListener('lostpointercapture',stop);
+            new ResizeObserver(() => { if (!dragging) { fit(); save(); } }).observe(widget);
+            window.addEventListener('resize',fit);
+            openMemo(); fit();
+        }
         window.addEventListener('message',event => {
-            if (event.origin === location.origin && event.source === document.getElementById('memo-frame').contentWindow && event.data?.type === 'hachoriclass:memo-close') closeMemo();
+            if (event.origin !== location.origin || event.source !== document.getElementById('memo-frame').contentWindow) return;
+            if (event.data?.type === 'hachoriclass:memo-close') closeMemo();
+            if (event.data?.type === 'hachoriclass:memo-focus') bringMemoToFront();
         });
         function dismissDrawChooserOutside(event) {
             const chooser = document.getElementById('draw-chooser');
@@ -1692,6 +1740,7 @@
             // 초기 실행 시 켜둘 위젯 설정
             toggleWidget('widget-clock', 'btn-clock'); 
             toggleWidget('widget-note', 'btn-note');
+            setupMemoWidget();
             // 룰렛 위젯도 처음에 열어두려면 아래 주석을 해제하세요.
             // toggleWidget('widget-roulette', 'btn-roulette');
         };

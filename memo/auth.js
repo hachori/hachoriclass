@@ -1,4 +1,4 @@
-import {MemoBoard,cleanState,mergeStates,fingerprint,validToken,tokenFor,tokenBytes,bytes,fromBase64,ACTIVE_KEY,CACHE_PREFIX,CLOUD,API_KEY} from './app.js?v=2';
+import {MemoBoard,cleanState,mergeStates,fingerprint,validToken,tokenFor,tokenBytes,bytes,fromBase64,ACTIVE_KEY,CACHE_PREFIX,CLOUD,API_KEY} from './app.js?v=3';
 
 const el = id => document.getElementById(id);
 const PROFILE_CACHE = 'hachoriclass_memo_profile_v2_';
@@ -162,7 +162,7 @@ class MemoSession {
       let token = this.savedLegacy(); const entered = el('legacy-url').value.trim();
       if (entered) {
         let url; try { url = new URL(entered); } catch {}
-        if (!url || url.origin !== location.origin || url.pathname.replace(/\/$/,'') !== new URL('./',location.href).pathname.replace(/\/$/,'') || !/^#v1\.[A-Za-z0-9_-]{43}$/.test(url.hash)) throw new Error('이전 ‘내 메모 링크’ 주소 전체를 붙여넣어 주세요.');
+        if (!url || url.origin !== location.origin || url.pathname.replace(/\/$/,'') !== new URL('./',import.meta.url).pathname.replace(/\/$/,'') || !/^#v1\.[A-Za-z0-9_-]{43}$/.test(url.hash)) throw new Error('이전 ‘내 메모 링크’ 주소 전체를 붙여넣어 주세요.');
         token = url.hash.slice(4);
       }
       if (!validToken(token)) throw new Error('이 기기에 이전 메모가 없어요. 사용하던 메모 링크를 입력해 주세요.');
